@@ -1,69 +1,25 @@
+/**
+ * gamificationController.js — versión refactorizada con patrones
+ *
+ * CAMBIO PRINCIPAL:
+ * completarModulo() ya NO llama directamente a puntos e insignias.
+ * Ahora emite un evento al canalGamificacion (Observer),
+ * y los observadores suscritos reaccionan de forma independiente.
+ *
+ * Resultado: el controlador no sabe nada de puntos ni de insignias.
+ * Solo sabe que "ocurrió algo" y lo anuncia.
+ */
+
 const { query, sql } = require("../config/db");
-const { obtenerTotalPuntos } = require("../services/pointsService");
-const { UMBRAL_INSIGNIA, INSIGNIA } = require("../utils/constants");
+const { PointsRepository } = require("../repositories/PointsRepository");
+const { canalGamificacion } = require("../observers/GamificationObserver");
 
-async function verificarYAsignarInsignias(usuarioId) {
-  const resModulos = await query(
-    `SELECT COUNT(*) AS total
-     FROM progreso
-     WHERE usuario_id = @uid AND completado = 1`,
-    { uid: { type: sql.Int, value: usuarioId } }
-  );
-  const modulosCompletados = resModulos.recordset[0].total;
-
-  const totalPuntos = await obtenerTotalPuntos(usuarioId);
-
-  const reglas = [
-    { umbral: UMBRAL_INSIGNIA.PRIMER_MODULO,    nombre: INSIGNIA.PRIMER_PASO,        tipo: "modulos" },
-    { umbral: UMBRAL_INSIGNIA.ESTUDIANTE_ACTIVO, nombre: INSIGNIA.ESTUDIANTE_ACTIVO,  tipo: "modulos" },
-    { umbral: UMBRAL_INSIGNIA.EXPERTO,           nombre: INSIGNIA.EXPERTO,            tipo: "modulos" },
-    { umbral: UMBRAL_INSIGNIA.MAESTRO,           nombre: INSIGNIA.MAESTRO,            tipo: "modulos" },
-    { umbral: UMBRAL_INSIGNIA.PUNTAJE_BRONCE,    nombre: INSIGNIA.BRONCE,             tipo: "puntos"  },
-    { umbral: UMBRAL_INSIGNIA.PUNTAJE_PLATA,     nombre: INSIGNIA.PLATA,              tipo: "puntos"  },
-    { umbral: UMBRAL_INSIGNIA.PUNTAJE_ORO,       nombre: INSIGNIA.ORO,                tipo: "puntos"  },
-  ];
-
-  const nuevasInsignias = [];
-
-  for (const regla of reglas) {
-    const valor = regla.tipo === "modulos" ? modulosCompletados : totalPuntos;
-    if (valor < regla.umbral) continue;
-
-    const resInsignia = await query(
-      `SELECT id FROM insignias WHERE nombre = @nombre`,
-      { nombre: { type: sql.VarChar, value: regla.nombre } }
-    );
-    if (resInsignia.recordset.length === 0) continue;
-
-    const insigniaId = resInsignia.recordset[0].id;
-    const yaLaTiene = await query(
-      `SELECT id FROM usuario_insignias
-       WHERE usuario_id = @uid AND insignia_id = @iid`,
-      {
-        uid: { type: sql.Int, value: usuarioId  },
-        iid: { type: sql.Int, value: insigniaId },
-      }
-    );
-    if (yaLaTiene.recordset.length > 0) continue;
-    await query(
-      `INSERT INTO usuario_insignias (usuario_id, insignia_id)
-       VALUES (@uid, @iid)`,
-      {
-        uid: { type: sql.Int, value: usuarioId  },
-        iid: { type: sql.Int, value: insigniaId },
-      }
-    );
-
-    nuevasInsignias.push(regla.nombre);
-  }
-
-  return nuevasInsignias;
-}
-
+// ─────────────────────────────────────────────
+// GET /api/gamification/insignias/:usuarioId
+// ─────────────────────────────────────────────
 async function obtenerInsignias(req, res) {
   try {
     const { usuarioId } = req.params;
-
     const result = await query(
       `SELECT i.id, i.nombre, i.descripcion, i.icono, ui.fecha_obtenida
        FROM usuario_insignias ui
@@ -72,7 +28,6 @@ async function obtenerInsignias(req, res) {
        ORDER BY ui.fecha_obtenida DESC`,
       { uid: { type: sql.Int, value: parseInt(usuarioId) } }
     );
-
     res.json({ insignias: result.recordset });
   } catch (error) {
     console.error("Error al obtener insignias:", error);
@@ -80,7 +35,10 @@ async function obtenerInsignias(req, res) {
   }
 }
 
-
+// ─────────────────────────────────────────────
+// POST /api/gamification/completar-modulo
+// Ahora usa Observer — emite evento y listo
+// ─────────────────────────────────────────────
 async function completarModulo(req, res) {
   try {
     const { usuarioId, moduloId } = req.body;
@@ -89,13 +47,12 @@ async function completarModulo(req, res) {
       return res.status(400).json({ error: "usuarioId y moduloId son requeridos" });
     }
 
+    // 1. Registrar progreso en DB
     await query(
       `IF NOT EXISTS (
-         SELECT 1 FROM progreso
-         WHERE usuario_id = @uid AND modulo_id = @mid
+         SELECT 1 FROM progreso WHERE usuario_id = @uid AND modulo_id = @mid
        )
-       INSERT INTO progreso (usuario_id, modulo_id, completado)
-       VALUES (@uid, @mid, 1)
+       INSERT INTO progreso (usuario_id, modulo_id, completado) VALUES (@uid, @mid, 1)
        ELSE
        UPDATE progreso SET completado = 1, fecha = GETDATE()
        WHERE usuario_id = @uid AND modulo_id = @mid`,
@@ -105,17 +62,22 @@ async function completarModulo(req, res) {
       }
     );
 
-    const { puntajeporModulo } = require("../services/pointsService");
-    await puntajeporModulo(usuarioId);
+    // 2. Emitir evento — Observer notifica a PuntosObserver e InsigniasObserver
+    const resultados = await canalGamificacion.emitir("modulo:completado", { usuarioId, moduloId });
 
-    const nuevasInsignias = await verificarYAsignarInsignias(usuarioId);
+    // 3. Extraer resultados de los observadores
+    // resultados[0] = LogObserver (undefined), [1] = PuntosObserver, [2] = InsigniasObserver
+    const resPuntos    = resultados[1] || {};
+    const nuevasInsignias = resultados[2] || [];
 
-    const totalPuntos = await obtenerTotalPuntos(usuarioId);
+    // 4. Obtener total de puntos actualizado
+    const repositorio  = new PointsRepository();
+    const totalPuntos  = await repositorio.obtenerTotal(usuarioId);
 
     res.json({
       mensaje: "Módulo completado",
       totalPuntos,
-      nuevasInsignias,  
+      nuevasInsignias,
     });
   } catch (error) {
     console.error("Error al completar módulo:", error);
@@ -123,15 +85,15 @@ async function completarModulo(req, res) {
   }
 }
 
+// ─────────────────────────────────────────────
+// GET /api/gamification/ranking
+// ─────────────────────────────────────────────
 async function obtenerRanking(req, res) {
   try {
     const result = await query(
-      `SELECT TOP 10
-         usuario_id, nombre, total_puntos, posicion
-       FROM ranking
-       ORDER BY posicion ASC`
+      `SELECT TOP 10 usuario_id, nombre, total_puntos, posicion
+       FROM ranking ORDER BY posicion ASC`
     );
-
     res.json({ ranking: result.recordset });
   } catch (error) {
     console.error("Error al obtener ranking:", error);
@@ -139,21 +101,20 @@ async function obtenerRanking(req, res) {
   }
 }
 
+// ─────────────────────────────────────────────
+// GET /api/gamification/mis-puntos/:usuarioId
+// ─────────────────────────────────────────────
 async function misPuntos(req, res) {
   try {
     const { usuarioId } = req.params;
-
     const result = await query(
       `SELECT usuario_id, nombre, total_puntos, posicion
-       FROM ranking
-       WHERE usuario_id = @uid`,
+       FROM ranking WHERE usuario_id = @uid`,
       { uid: { type: sql.Int, value: parseInt(usuarioId) } }
     );
-
-    if (result.recordset.length === 0) {
+    if (!result.recordset.length) {
       return res.json({ totalPuntos: 0, posicion: null });
     }
-
     res.json(result.recordset[0]);
   } catch (error) {
     console.error("Error al obtener puntos:", error);
@@ -161,9 +122,4 @@ async function misPuntos(req, res) {
   }
 }
 
-module.exports = {
-  obtenerInsignias,
-  completarModulo,
-  obtenerRanking,
-  misPuntos,
-};
+module.exports = { obtenerInsignias, completarModulo, obtenerRanking, misPuntos };

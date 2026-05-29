@@ -191,4 +191,5 @@ module.exports = {
   crearCurso,
   agregarModulo,
   verificarCursoCompleto,
+  calcularPorcentaje,
 };
