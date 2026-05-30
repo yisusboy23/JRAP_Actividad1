@@ -126,5 +126,39 @@ describe("ContextoPuntos", () => {
     expect(resultado.asignado).toBe(false);
     expect(repoMock.guardar).not.toHaveBeenCalled(); // no se guardó nada
   });
+// ──────────────────────────────────────────────────────────
+// Pruebas de RachaSemanalStrategy
+// ──────────────────────────────────────────────────────────
 
+describe("RachaSemanalStrategy", () => {
+  const estrategia = new RachaSemanalStrategy();
+
+  test("getCantidad() retorna puntos de racha semanal", () => {
+    expect(estrategia.getCantidad()).toBe(PUNTOS.RACHA_7_DIAS);
+  });
+
+  test("getMotivo() retorna el motivo correcto", () => {
+    expect(estrategia.getMotivo()).toBe(MOTIVO_PUNTOS.RACHA);
+  });
+
+  test("esElegible() retorna TRUE si no recibió puntos de racha", async () => {
+    const repoMock = {
+      existeHoyPorMotivo: jest.fn().mockResolvedValue(false),
+    };
+
+    const resultado = await estrategia.esElegible(1, repoMock);
+
+    expect(resultado).toBe(true);
+  });
+
+  test("esElegible() retorna FALSE si ya recibió puntos de racha", async () => {
+    const repoMock = {
+      existeHoyPorMotivo: jest.fn().mockResolvedValue(true),
+    };
+
+    const resultado = await estrategia.esElegible(1, repoMock);
+
+    expect(resultado).toBe(false);
+  });
+});
 });
