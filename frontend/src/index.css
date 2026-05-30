@@ -242,6 +242,8 @@ code {
   padding: 0.6rem 0.85rem;
   border: 1.5px solid #d1d5db;
   border-radius: 7px;
+    color: #111827 !important;  
+  caret-color: #111827;       
   font-size: 0.95rem;
   outline: none;
   width: 100%;
@@ -294,3 +296,16 @@ code {
 
 /* ── Navbar botón salir ─────────────── */
 .nav-link-btn { background: none; border: none; cursor: pointer; font-size: inherit; font-family: inherit; }
+
+.boton-peligro {
+  background-color: #ef4444;
+  color: white;
+  border: none;
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+.boton-peligro:hover {
+  background-color: #dc2626;
+}

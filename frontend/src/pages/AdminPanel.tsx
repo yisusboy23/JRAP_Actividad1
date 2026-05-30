@@ -1,15 +1,14 @@
-/**
- * AdminPanel.tsx
- * Usa las rutas ya existentes en el backend:
- *   POST /api/courses           → crearCurso
- *   POST /api/courses/:id/modulos → agregarModulo
- *   GET  /api/courses           → listar cursos
- */
-
 import { useEffect, useState, FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
+
+interface Modulo {
+  id: number;
+  titulo: string;
+  orden: number;
+  nivel_id: number;
+}
 
 interface Curso {
   id: number;
@@ -19,7 +18,11 @@ interface Curso {
   total_modulos: number;
 }
 
-type Seccion = "cursos" | "crearCurso" | "crearModulo";
+interface CursoDetalle extends Curso {
+  modulos: Modulo[];
+}
+
+type Seccion = "cursos" | "crearCurso" | "crearModulo" | "crearEstudiante" | "editarCurso";
 
 const NIVELES = [
   { id: 1, nombre: "Básico"     },
@@ -31,23 +34,36 @@ export default function AdminPanel() {
   const { docente, logout } = useAuth();
   const navigate = useNavigate();
 
-  const [cursos,    setCursos]    = useState<Curso[]>([]);
-  const [seccion,   setSeccion]   = useState<Seccion>("cursos");
-  const [feedback,  setFeedback]  = useState<{ tipo: "ok" | "err"; msg: string } | null>(null);
+  const [cursos,   setCursos]   = useState<Curso[]>([]);
+  const [seccion,  setSeccion]  = useState<Seccion>("cursos");
+  const [feedback, setFeedback] = useState<{ tipo: "ok" | "err"; msg: string } | null>(null);
 
-  // Form: nuevo curso
+  // Crear curso
   const [tituloCurso, setTituloCurso] = useState("");
   const [descCurso,   setDescCurso]   = useState("");
 
-  // Form: nuevo módulo
+  // Crear módulo
   const [cursoSelec, setCursoSelec] = useState<number>(0);
   const [tituloMod,  setTituloMod]  = useState("");
   const [ordenMod,   setOrdenMod]   = useState(1);
   const [nivelMod,   setNivelMod]   = useState(1);
 
-  useEffect(() => {
-    cargarCursos();
-  }, []);
+  // Crear estudiante
+  const [nomEst,   setNomEst]   = useState("");
+  const [emailEst, setEmailEst] = useState("");
+  const [passEst,  setPassEst]  = useState("");
+  const [ciEst,    setCiEst]    = useState("");
+
+  // Editar curso
+  const [cursoEditar,    setCursoEditar]    = useState<CursoDetalle | null>(null);
+  const [tituloEdit,     setTituloEdit]     = useState("");
+  const [descEdit,       setDescEdit]       = useState("");
+  const [moduloEditando, setModuloEditando] = useState<number | null>(null);
+  const [tituloModEdit,  setTituloModEdit]  = useState("");
+  const [ordenModEdit,   setOrdenModEdit]   = useState(1);
+  const [nivelModEdit,   setNivelModEdit]   = useState(1);
+
+  useEffect(() => { cargarCursos(); }, []);
 
   async function cargarCursos() {
     const res = await api.get("/courses");
@@ -59,13 +75,92 @@ export default function AdminPanel() {
     setTimeout(() => setFeedback(null), 4000);
   }
 
+  // ── Abrir editor de curso ──
+  async function abrirEditorCurso(cursoId: number) {
+    const res = await api.get(`/courses/${cursoId}`);
+    const { curso, modulos } = res.data;
+    setCursoEditar({ ...curso, modulos, total_modulos: modulos.length });
+    setTituloEdit(curso.titulo);
+    setDescEdit(curso.descripcion || "");
+    setModuloEditando(null);
+    setSeccion("editarCurso");
+  }
+
+  // ── Guardar cambios del curso ──
+  async function handleGuardarCurso(e: FormEvent) {
+    e.preventDefault();
+    if (!cursoEditar) return;
+    try {
+      await api.put(`/courses/${cursoEditar.id}`, { titulo: tituloEdit, descripcion: descEdit });
+      mostrarFeedback("ok", "Curso actualizado correctamente");
+      setCursoEditar((prev) => prev ? { ...prev, titulo: tituloEdit, descripcion: descEdit } : prev);
+      cargarCursos();
+    } catch (err: any) {
+      mostrarFeedback("err", err?.response?.data?.error || "Error al actualizar curso");
+    }
+  }
+
+  // ── Eliminar curso ──
+  async function handleEliminarCurso(id: number) {
+    if (!confirm("¿Eliminar este curso y todos sus módulos?")) return;
+    try {
+      await api.delete(`/courses/${id}`);
+      mostrarFeedback("ok", "Curso eliminado");
+      setSeccion("cursos");
+      cargarCursos();
+    } catch (err: any) {
+      mostrarFeedback("err", err?.response?.data?.error || "Error al eliminar curso");
+    }
+  }
+
+  // ── Iniciar edición de módulo ──
+  function iniciarEditarModulo(mod: Modulo) {
+    setModuloEditando(mod.id);
+    setTituloModEdit(mod.titulo);
+    setOrdenModEdit(mod.orden);
+    setNivelModEdit(mod.nivel_id);
+  }
+
+  // ── Guardar módulo editado ──
+  async function handleGuardarModulo(moduloId: number) {
+    if (!cursoEditar) return;
+    try {
+      await api.put(`/courses/${cursoEditar.id}/modulos/${moduloId}`, {
+        titulo:   tituloModEdit,
+        orden:    ordenModEdit,
+        nivel_id: nivelModEdit,
+      });
+      mostrarFeedback("ok", "Módulo actualizado");
+      setModuloEditando(null);
+      const res = await api.get(`/courses/${cursoEditar.id}`);
+      setCursoEditar((prev) => prev ? { ...prev, modulos: res.data.modulos } : prev);
+    } catch (err: any) {
+      mostrarFeedback("err", err?.response?.data?.error || "Error al actualizar módulo");
+    }
+  }
+
+  // ── Eliminar módulo ──
+  async function handleEliminarModulo(moduloId: number) {
+    if (!cursoEditar) return;
+    if (!confirm("¿Eliminar este módulo?")) return;
+    try {
+      await api.delete(`/courses/${cursoEditar.id}/modulos/${moduloId}`);
+      mostrarFeedback("ok", "Módulo eliminado");
+      setCursoEditar((prev) =>
+        prev ? { ...prev, modulos: prev.modulos.filter((m) => m.id !== moduloId) } : prev
+      );
+      cargarCursos();
+    } catch (err: any) {
+      mostrarFeedback("err", err?.response?.data?.error || "Error al eliminar módulo");
+    }
+  }
+
   async function handleCrearCurso(e: FormEvent) {
     e.preventDefault();
     try {
       const res = await api.post("/courses", { titulo: tituloCurso, descripcion: descCurso });
       mostrarFeedback("ok", `Curso creado (ID: ${res.data.cursoId})`);
-      setTituloCurso("");
-      setDescCurso("");
+      setTituloCurso(""); setDescCurso("");
       cargarCursos();
     } catch (err: any) {
       mostrarFeedback("err", err?.response?.data?.error || "Error al crear curso");
@@ -77,16 +172,26 @@ export default function AdminPanel() {
     if (cursoSelec === 0) return mostrarFeedback("err", "Seleccioná un curso");
     try {
       const res = await api.post(`/courses/${cursoSelec}/modulos`, {
-        titulo:   tituloMod,
-        orden:    ordenMod,
-        nivel_id: nivelMod,
+        titulo: tituloMod, orden: ordenMod, nivel_id: nivelMod,
       });
       mostrarFeedback("ok", `Módulo creado (ID: ${res.data.moduloId})`);
-      setTituloMod("");
-      setOrdenMod((n) => n + 1);
+      setTituloMod(""); setOrdenMod((n) => n + 1);
       cargarCursos();
     } catch (err: any) {
       mostrarFeedback("err", err?.response?.data?.error || "Error al crear módulo");
+    }
+  }
+
+  async function handleCrearEstudiante(e: FormEvent) {
+    e.preventDefault();
+    try {
+      const res = await api.post("/users/estudiantes", {
+        nombre: nomEst, email: emailEst, password: passEst, ci: ciEst || undefined,
+      });
+      mostrarFeedback("ok", `Estudiante creado (ID: ${res.data.estudianteId})`);
+      setNomEst(""); setEmailEst(""); setPassEst(""); setCiEst("");
+    } catch (err: any) {
+      mostrarFeedback("err", err?.response?.data?.error || "Error al crear estudiante");
     }
   }
 
@@ -101,22 +206,24 @@ export default function AdminPanel() {
             Bienvenido/a, <strong>{docente?.nombre} {docente?.apellido}</strong>
           </p>
         </div>
-        <button className="boton-secundario" onClick={() => { logout(); navigate("/"); }}>
+        <button className="boton-secundario" onClick={() => { logout(); navigate("/login"); }}>
           Cerrar sesión
         </button>
       </div>
 
       {/* Tabs */}
       <div className="admin-tabs">
-        {(["cursos", "crearCurso", "crearModulo"] as Seccion[]).map((s) => (
-          <button
-            key={s}
+        {(["cursos", "crearCurso", "crearModulo", "crearEstudiante"] as Seccion[]).map((s) => (
+          <button key={s}
             className={`tab${seccion === s ? " tab-activo" : ""}`}
-            onClick={() => setSeccion(s)}
+            onClick={() => { setSeccion(s); setModuloEditando(null); }}
           >
-            {{ cursos: "📚 Cursos", crearCurso: "➕ Nuevo curso", crearModulo: "📝 Nuevo módulo" }[s]}
+{{ cursos: "📚 Cursos", crearCurso: "➕ Nuevo curso", crearModulo: "📝 Nuevo módulo", crearEstudiante: "🧑 Nuevo estudiante", editarCurso: "✏️ Editar" }[s]}
           </button>
         ))}
+        {seccion === "editarCurso" && cursoEditar && (
+          <button className="tab tab-activo">✏️ {cursoEditar.titulo}</button>
+        )}
       </div>
 
       {/* Feedback */}
@@ -137,9 +244,92 @@ export default function AdminPanel() {
                   <p className="descripcion">{c.descripcion || "Sin descripción"}</p>
                   <p className="instructor">Instructor: {c.instructor || "—"}</p>
                   <span className="badge-fecha">{c.total_modulos} módulo(s)</span>
+                  <div style={{ marginTop: "0.75rem", display: "flex", gap: "0.5rem" }}>
+                    <button className="boton-secundario" onClick={() => abrirEditorCurso(c.id)}>
+                      ✏️ Editar
+                    </button>
+                    <button className="boton-peligro" onClick={() => handleEliminarCurso(c.id)}>
+                      Eliminar
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
+      )}
+
+      {/* ── Editor de curso ── */}
+      {seccion === "editarCurso" && cursoEditar && (
+        <div>
+          <div className="form-card" style={{ marginBottom: "1.5rem" }}>
+            <h3>Editar curso</h3>
+            <form onSubmit={handleGuardarCurso}>
+              <div className="campo">
+                <label className="campo-label">Título *</label>
+                <input type="text" className="campo-input"
+                  value={tituloEdit} onChange={(e) => setTituloEdit(e.target.value)}
+                  maxLength={150} required />
+              </div>
+              <div className="campo">
+                <label className="campo-label">Descripción</label>
+                <textarea className="campo-input campo-textarea" rows={3}
+                  value={descEdit} onChange={(e) => setDescEdit(e.target.value)} />
+              </div>
+              <div style={{ display: "flex", gap: "0.5rem" }}>
+                <button type="submit" className="boton-primario">Guardar cambios</button>
+                <button type="button" className="boton-peligro"
+                  onClick={() => handleEliminarCurso(cursoEditar.id)}>
+                  🗑️ Eliminar curso
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <div className="form-card">
+            <h3>Módulos del curso</h3>
+            {cursoEditar.modulos.length === 0
+              ? <p className="vacio">Sin módulos aún.</p>
+              : cursoEditar.modulos.map((mod) => (
+                <div key={mod.id} style={{ borderBottom: "1px solid #e5e7eb", padding: "0.75rem 0" }}>
+                  {moduloEditando === mod.id ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                      <input type="text" className="campo-input"
+                        value={tituloModEdit} onChange={(e) => setTituloModEdit(e.target.value)}
+                        placeholder="Título" />
+                      <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                        <input type="number" className="campo-input" style={{ width: "80px" }}
+                          value={ordenModEdit} min={1}
+                          onChange={(e) => setOrdenModEdit(Number(e.target.value))} />
+                        <select className="campo-input"
+                          value={nivelModEdit} onChange={(e) => setNivelModEdit(Number(e.target.value))}>
+                          {NIVELES.map((n) => <option key={n.id} value={n.id}>{n.nombre}</option>)}
+                        </select>
+                        <button className="boton-primario" onClick={() => handleGuardarModulo(mod.id)}>
+                          Guardar
+                        </button>
+                        <button className="boton-secundario" onClick={() => setModuloEditando(null)}>
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span>
+                        <strong>{mod.orden}.</strong> {mod.titulo}
+                        <span style={{ marginLeft: "0.5rem", fontSize: "0.8rem", color: "#6b7280" }}>
+                          ({NIVELES.find((n) => n.id === mod.nivel_id)?.nombre})
+                        </span>
+                      </span>
+                      <div style={{ display: "flex", gap: "0.5rem" }}>
+                        <button className="boton-secundario" onClick={() => iniciarEditarModulo(mod)}>✏️</button>
+                        <button className="boton-peligro" onClick={() => handleEliminarModulo(mod.id)}>🗑️</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))
+            }
+          </div>
+        </div>
       )}
 
       {/* ── Crear curso ── */}
@@ -149,25 +339,16 @@ export default function AdminPanel() {
           <form onSubmit={handleCrearCurso}>
             <div className="campo">
               <label className="campo-label">Título *</label>
-              <input
-                type="text"
-                className="campo-input"
+              <input type="text" className="campo-input"
                 placeholder="Ej: Programación Web con React"
-                value={tituloCurso}
-                onChange={(e) => setTituloCurso(e.target.value)}
-                maxLength={150}
-                required
-              />
+                value={tituloCurso} onChange={(e) => setTituloCurso(e.target.value)}
+                maxLength={150} required />
             </div>
             <div className="campo">
               <label className="campo-label">Descripción</label>
-              <textarea
-                className="campo-input campo-textarea"
+              <textarea className="campo-input campo-textarea" rows={4}
                 placeholder="Describe el contenido del curso..."
-                value={descCurso}
-                onChange={(e) => setDescCurso(e.target.value)}
-                rows={4}
-              />
+                value={descCurso} onChange={(e) => setDescCurso(e.target.value)} />
             </div>
             <button type="submit" className="boton-primario">Crear curso</button>
           </form>
@@ -181,54 +362,32 @@ export default function AdminPanel() {
           <form onSubmit={handleCrearModulo}>
             <div className="campo">
               <label className="campo-label">Curso *</label>
-              <select
-                className="campo-input"
-                value={cursoSelec}
-                onChange={(e) => setCursoSelec(Number(e.target.value))}
-                required
-              >
+              <select className="campo-input" value={cursoSelec}
+                onChange={(e) => setCursoSelec(Number(e.target.value))} required>
                 <option value={0}>-- Seleccioná un curso --</option>
                 {cursos.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.titulo} ({c.total_modulos} módulos)
-                  </option>
+                  <option key={c.id} value={c.id}>{c.titulo} ({c.total_modulos} módulos)</option>
                 ))}
               </select>
             </div>
             <div className="campo">
               <label className="campo-label">Título del módulo *</label>
-              <input
-                type="text"
-                className="campo-input"
+              <input type="text" className="campo-input"
                 placeholder="Ej: Introducción a React"
-                value={tituloMod}
-                onChange={(e) => setTituloMod(e.target.value)}
-                maxLength={150}
-                required
-              />
+                value={tituloMod} onChange={(e) => setTituloMod(e.target.value)}
+                maxLength={150} required />
             </div>
             <div className="campo-fila">
               <div className="campo">
                 <label className="campo-label">Orden *</label>
-                <input
-                  type="number"
-                  className="campo-input"
-                  min={1}
-                  value={ordenMod}
-                  onChange={(e) => setOrdenMod(Number(e.target.value))}
-                  required
-                />
+                <input type="number" className="campo-input" min={1}
+                  value={ordenMod} onChange={(e) => setOrdenMod(Number(e.target.value))} required />
               </div>
               <div className="campo">
                 <label className="campo-label">Nivel *</label>
-                <select
-                  className="campo-input"
-                  value={nivelMod}
-                  onChange={(e) => setNivelMod(Number(e.target.value))}
-                >
-                  {NIVELES.map((n) => (
-                    <option key={n.id} value={n.id}>{n.nombre}</option>
-                  ))}
+                <select className="campo-input" value={nivelMod}
+                  onChange={(e) => setNivelMod(Number(e.target.value))}>
+                  {NIVELES.map((n) => <option key={n.id} value={n.id}>{n.nombre}</option>)}
                 </select>
               </div>
             </div>
@@ -236,6 +395,38 @@ export default function AdminPanel() {
           </form>
         </div>
       )}
+
+      {/* ── Crear estudiante ── */}
+      {seccion === "crearEstudiante" && (
+        <div className="form-card">
+          <h3>Crear nuevo estudiante</h3>
+          <form onSubmit={handleCrearEstudiante}>
+            <div className="campo">
+              <label className="campo-label">Nombre *</label>
+              <input type="text" className="campo-input"
+                value={nomEst} onChange={(e) => setNomEst(e.target.value)} required />
+            </div>
+            <div className="campo">
+              <label className="campo-label">Email *</label>
+              <input type="email" className="campo-input"
+                value={emailEst} onChange={(e) => setEmailEst(e.target.value)} required />
+            </div>
+            <div className="campo">
+              <label className="campo-label">Contraseña *</label>
+              <input type="password" className="campo-input"
+                value={passEst} onChange={(e) => setPassEst(e.target.value)} required />
+            </div>
+            <div className="campo">
+              <label className="campo-label">CI (opcional)</label>
+              <input type="number" className="campo-input"
+                value={ciEst} onChange={(e) => setCiEst(e.target.value)}
+                min={1000000} max={9999999} />
+            </div>
+            <button type="submit" className="boton-primario">Crear estudiante</button>
+          </form>
+        </div>
+      )}
+
     </div>
   );
 }

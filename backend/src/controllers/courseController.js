@@ -185,6 +185,130 @@ async function verificarCursoCompleto(req, res) {
   }
 }
 
+async function actualizarCurso(req, res) {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const { titulo, descripcion } = req.body;
+
+    if (!titulo) {
+      return res.status(400).json({ error: "El título es requerido" });
+    }
+
+    const result = await query(
+      `UPDATE cursos
+       SET titulo = @titulo, descripcion = @descripcion
+       WHERE id = @id`,
+      {
+        id: { type: sql.Int, value: id },
+        titulo: { type: sql.VarChar, value: titulo },
+        descripcion: { type: sql.VarChar, value: descripcion || null },
+      }
+    );
+
+    if (result.rowsAffected[0] === 0) {
+      return res.status(404).json({ error: "Curso no encontrado" });
+    }
+
+    res.json({ mensaje: "Curso actualizado correctamente" });
+  } catch (error) {
+    console.error("Error al actualizar curso:", error);
+    res.status(500).json({ error: "Error al actualizar curso" });
+  }
+}
+
+async function eliminarCurso(req, res) {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id) || id <= 0)
+      return res.status(400).json({ error: "ID inválido" });
+
+    await query(
+      `DELETE FROM progreso WHERE modulo_id IN (SELECT id FROM modulos WHERE curso_id = @id)`,
+      { id: { type: sql.Int, value: id } }
+    );
+
+    await query(
+      `DELETE FROM modulos WHERE curso_id = @id`,
+      { id: { type: sql.Int, value: id } }
+    );
+
+    const result = await query(
+      `DELETE FROM cursos WHERE id = @id`,
+      { id: { type: sql.Int, value: id } }
+    );
+
+    if (result.rowsAffected[0] === 0)
+      return res.status(404).json({ error: "Curso no encontrado" });
+
+    res.json({ mensaje: "Curso eliminado correctamente" });
+  } catch (error) {
+    console.error("Error al eliminar curso:", error);
+    res.status(500).json({ error: "Error al eliminar curso" });
+  }
+}
+
+async function actualizarModuloDeCurso(req, res) {
+  try {
+    const moduloId = parseInt(req.params.moduloId, 10);
+    const titulo   = typeof req.body.titulo === "string" ? req.body.titulo.trim() : null;
+    const orden    = parseInt(req.body.orden, 10);
+    const nivelId  = parseInt(req.body.nivel_id, 10);
+
+    if (isNaN(moduloId) || moduloId <= 0)
+      return res.status(400).json({ error: "moduloId inválido" });
+    if (!titulo)
+      return res.status(400).json({ error: "titulo es requerido" });
+    if (isNaN(orden) || orden < 1)
+      return res.status(400).json({ error: "orden inválido" });
+    if (isNaN(nivelId) || ![1, 2, 3].includes(nivelId))
+      return res.status(400).json({ error: "nivel_id inválido" });
+
+    const result = await query(
+      `UPDATE modulos SET titulo = @titulo, orden = @orden, nivel_id = @nivelId WHERE id = @id`,
+      {
+        id:      { type: sql.Int,     value: moduloId },
+        titulo:  { type: sql.VarChar, value: titulo   },
+        orden:   { type: sql.Int,     value: orden    },
+        nivelId: { type: sql.TinyInt, value: nivelId  },
+      }
+    );
+
+    if (result.rowsAffected[0] === 0)
+      return res.status(404).json({ error: "Módulo no encontrado" });
+
+    res.json({ mensaje: "Módulo actualizado correctamente" });
+  } catch (error) {
+    console.error("Error al actualizar módulo:", error);
+    res.status(500).json({ error: "Error al actualizar módulo" });
+  }
+}
+
+async function eliminarModuloDeCurso(req, res) {
+  try {
+    const moduloId = parseInt(req.params.moduloId, 10);
+
+    await query(
+      `DELETE FROM progreso WHERE modulo_id = @id`,
+      { id: { type: sql.Int, value: moduloId } }
+    );
+
+    const result = await query(
+      `DELETE FROM modulos WHERE id = @id`,
+      { id: { type: sql.Int, value: moduloId } }
+    );
+
+    if (result.rowsAffected[0] === 0) {
+      return res.status(404).json({ error: "Módulo no encontrado" });
+    }
+
+    res.json({ mensaje: "Módulo eliminado correctamente" });
+  } catch (error) {
+    console.error("Error al eliminar módulo:", error);
+    res.status(500).json({ error: "Error al eliminar módulo" });
+  }
+}
+
+
 module.exports = {
   listarCursos,
   obtenerCurso,
@@ -192,4 +316,8 @@ module.exports = {
   agregarModulo,
   verificarCursoCompleto,
   calcularPorcentaje,
+  actualizarCurso,
+  eliminarCurso,
+  actualizarModuloDeCurso,
+  eliminarModuloDeCurso,
 };

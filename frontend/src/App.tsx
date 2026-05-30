@@ -15,18 +15,11 @@ export default function App() {
         <Navbar />
         <main style={{ backgroundColor: "#f3f4f6", minHeight: "100vh", padding: "1rem" }}>
           <Routes>
-            <Route path="/"        element={<Dashboard />} />
-            <Route path="/ranking" element={<Ranking />}   />
-            <Route path="/badges"  element={<Badges />}    />
-            <Route path="/login"   element={<Login />}     />
-            <Route
-              path="/admin"
-              element={
-                <ProtectedRoute>
-                  <AdminPanel />
-                </ProtectedRoute>
-              }
-            />
+            <Route path="/login"   element={<Login />} />
+            <Route path="/"        element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/ranking" element={<ProtectedRoute><Ranking /></ProtectedRoute>}   />
+            <Route path="/badges"  element={<ProtectedRoute><Badges /></ProtectedRoute>}    />
+            <Route path="/admin"   element={<ProtectedRoute><AdminPanel /></ProtectedRoute>} />
           </Routes>
         </main>
       </BrowserRouter>
