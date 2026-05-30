@@ -5,7 +5,7 @@ const { query } = require("../config/db");
 router.get("/estudiantes", async (req, res) => {
   try {
     const result = await query(
-      "SELECT id, nombre FROM usuarios WHERE rol = 'estudiante'"
+        "SELECT id, nombre FROM usuarios"
     );
     res.json({ estudiantes: result.recordset });
   } catch (error) {

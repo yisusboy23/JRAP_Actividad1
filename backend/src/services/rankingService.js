@@ -17,7 +17,6 @@ async function obtenerRanking(limite = 10) {
        RANK() OVER (ORDER BY ISNULL(SUM(p.cantidad), 0) DESC) AS posicion
      FROM usuarios u
      LEFT JOIN puntos p ON p.usuario_id = u.id
-     WHERE u.rol = 'estudiante'
      GROUP BY u.id, u.nombre
      ORDER BY total_puntos DESC`,
     { limite: { type: sql.Int, value: limite } }
@@ -40,7 +39,6 @@ async function obtenerPosicionDeUsuario(usuarioId) {
          RANK() OVER (ORDER BY ISNULL(SUM(p.cantidad), 0) DESC) AS posicion
        FROM usuarios u
        LEFT JOIN puntos p ON p.usuario_id = u.id
-       WHERE u.rol = 'estudiante'
        GROUP BY u.id, u.nombre
      ) ranking
      WHERE id = @usuarioId`,

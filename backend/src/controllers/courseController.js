@@ -86,7 +86,7 @@ async function obtenerCurso(req, res) {
 async function crearCurso(req, res) {
   try {
     const { titulo, descripcion } = req.body;
-    const creadoPor = req.usuario?.id;
+    const creadoPor =  req.usuario?.id; 
 
     if (!titulo) {
       return res.status(400).json({ error: "El título es requerido" });

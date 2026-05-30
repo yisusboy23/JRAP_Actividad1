@@ -17,10 +17,17 @@
 
 const sql = require("mssql/msnodesqlv8");
 
+const REQUERIDAS = ["DB_SERVER", "DB_NAME"];
+const faltantes = REQUERIDAS.filter((v) => !process.env[v]);
+if (faltantes.length > 0) {
+  console.error(`❌ Variables de entorno faltantes: ${faltantes.join(", ")}`);
+  process.exit(1);
+}
+
 const dbConfig = {
   connectionString: `Driver={ODBC Driver 17 for SQL Server};Server=${process.env.DB_SERVER};Database=${process.env.DB_NAME};Trusted_Connection=yes;`,
   driver: "msnodesqlv8",
-  pool: {
+  pool: {         
     max: 10,
     min: 0,
     idleTimeoutMillis: 30000,

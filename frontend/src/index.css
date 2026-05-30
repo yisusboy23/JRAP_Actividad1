@@ -200,3 +200,97 @@ code {
 .boton-modulo { background: #4f46e5; color: #fff; border: none; padding: 0.3rem 0.6rem; border-radius: 4px; cursor: pointer; font-size: 0.8rem; }
 
 .subtitulo { margin-bottom: 1rem; color: #1a1a2e; font-size: 1rem; }
+
+/* ══════════════════════════════════════
+   Pegar al FINAL de tu index.css
+   ══════════════════════════════════════ */
+
+/* ── Login ─────────────────────────── */
+.login-page {
+  min-height: calc(100vh - 56px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.login-card {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.10);
+  padding: 2.5rem 2rem;
+  width: 100%;
+  max-width: 400px;
+}
+
+.login-header { text-align: center; margin-bottom: 2rem; }
+.login-logo   { font-size: 2.5rem; }
+.login-titulo { font-size: 1.4rem; font-weight: 700; margin: 0.5rem 0 0.25rem; color: #1e293b; }
+.login-subtitulo { color: #64748b; font-size: 0.9rem; margin: 0; }
+
+.login-form { display: flex; flex-direction: column; gap: 1.25rem; }
+.login-error {
+  background: #fee2e2; color: #dc2626;
+  border-radius: 6px; padding: 0.6rem 0.9rem; font-size: 0.875rem; margin: 0;
+}
+
+/* ── Campos reutilizables ───────────── */
+.campo          { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 1rem; }
+.campo-fila     { display: flex; gap: 1rem; }
+.campo-fila .campo { flex: 1; }
+.campo-label    { font-size: 0.875rem; font-weight: 600; color: #374151; }
+.campo-input    {
+  padding: 0.6rem 0.85rem;
+  border: 1.5px solid #d1d5db;
+  border-radius: 7px;
+  font-size: 0.95rem;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+  background: #fff;
+  font-family: inherit;
+}
+.campo-input:focus  { border-color: #3b82f6; }
+.campo-textarea     { resize: vertical; }
+
+/* ── Botones ────────────────────────── */
+.boton-primario {
+  padding: 0.7rem 1.5rem;
+  background: #3b82f6; color: #fff;
+  border: none; border-radius: 8px;
+  font-size: 0.95rem; font-weight: 600;
+  cursor: pointer; transition: background 0.2s;
+  margin-top: 0.5rem;
+}
+.boton-primario:hover    { background: #2563eb; }
+.boton-primario:disabled { opacity: 0.6; cursor: not-allowed; }
+.w-full { width: 100%; }
+
+/* ── Admin Panel ────────────────────── */
+.admin-header {
+  display: flex; justify-content: space-between;
+  align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;
+}
+.admin-tabs { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+
+.tab {
+  padding: 0.5rem 1.25rem;
+  border: 2px solid #e2e8f0; background: #fff;
+  border-radius: 8px; cursor: pointer;
+  font-size: 0.9rem; font-weight: 500; color: #475569;
+  transition: all 0.15s;
+}
+.tab:hover    { border-color: #3b82f6; color: #3b82f6; }
+.tab-activo   { background: #3b82f6 !important; border-color: #3b82f6 !important; color: #fff !important; }
+
+.form-card {
+  background: #fff; border-radius: 12px;
+  padding: 2rem; box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+  max-width: 560px;
+}
+.form-card h3 { margin-top: 0; margin-bottom: 1.5rem; font-size: 1.15rem; color: #1e293b; }
+
+.alerta-ok  { background: #dcfce7; color: #166534; border-left: 4px solid #22c55e; }
+.alerta-err { background: #fee2e2; color: #dc2626; border-left: 4px solid #ef4444; }
+
+/* ── Navbar botón salir ─────────────── */
+.nav-link-btn { background: none; border: none; cursor: pointer; font-size: inherit; font-family: inherit; }
