@@ -284,6 +284,7 @@ export default function AdminPanel() {
             </form>
           </div>
 
+
           <div className="form-card">
             <h3>Módulos del curso</h3>
             {cursoEditar.modulos.length === 0
@@ -328,6 +329,53 @@ export default function AdminPanel() {
                 </div>
               ))
             }
+          </div>
+          {/* ── Agregar módulo al curso editado ── */}
+          <div className="form-card" style={{ marginTop: "1.5rem" }}>
+            <h3>Agregar módulo a este curso</h3>
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              if (!cursoEditar) return;
+              try {
+                await api.post(`/courses/${cursoEditar.id}/modulos`, {
+                  titulo:   tituloMod,
+                  orden:    ordenMod,
+                  nivel_id: nivelMod,
+                });
+                mostrarFeedback("ok", "Módulo agregado");
+                setTituloMod("");
+                setOrdenMod((n) => n + 1);
+                // Recargar módulos del curso
+                const res = await api.get(`/courses/${cursoEditar.id}`);
+                setCursoEditar((prev) => prev ? { ...prev, modulos: res.data.modulos } : prev);
+                cargarCursos();
+              } catch (err: any) {
+                mostrarFeedback("err", err?.response?.data?.error || "Error al agregar módulo");
+              }
+            }}>
+              <div className="campo">
+                <label className="campo-label">Título del módulo *</label>
+                <input type="text" className="campo-input"
+                  placeholder="Ej: Introducción a React"
+                  value={tituloMod} onChange={(e) => setTituloMod(e.target.value)}
+                  maxLength={150} required />
+              </div>
+              <div className="campo-fila">
+                <div className="campo">
+                  <label className="campo-label">Orden *</label>
+                  <input type="number" className="campo-input" min={1}
+                    value={ordenMod} onChange={(e) => setOrdenMod(Number(e.target.value))} required />
+                </div>
+                <div className="campo">
+                  <label className="campo-label">Nivel *</label>
+                  <select className="campo-input" value={nivelMod}
+                    onChange={(e) => setNivelMod(Number(e.target.value))}>
+                    {NIVELES.map((n) => <option key={n.id} value={n.id}>{n.nombre}</option>)}
+                  </select>
+                </div>
+              </div>
+              <button type="submit" className="boton-primario">➕ Agregar módulo</button>
+            </form>
           </div>
         </div>
       )}
