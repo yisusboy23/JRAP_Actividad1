@@ -56,6 +56,8 @@ export default function AdminPanel() {
 
   // Editar curso
   const [cursoEditar,    setCursoEditar]    = useState<CursoDetalle | null>(null);
+  const [modulosDisponibles, setModulosDisponibles] = useState<Modulo[]>([]);
+const [moduloAgregar, setModuloAgregar] = useState<number>(0);
   const [tituloEdit,     setTituloEdit]     = useState("");
   const [descEdit,       setDescEdit]       = useState("");
   const [moduloEditando, setModuloEditando] = useState<number | null>(null);
@@ -76,15 +78,26 @@ export default function AdminPanel() {
   }
 
   // ── Abrir editor de curso ──
-  async function abrirEditorCurso(cursoId: number) {
-    const res = await api.get(`/courses/${cursoId}`);
-    const { curso, modulos } = res.data;
+async function abrirEditorCurso(cursoId: number) {
+  try {
+    const [resCurso, resTodos] = await Promise.all([
+      api.get(`/courses/${cursoId}`),
+      api.get(`/modulos/todos`),
+    ]);
+    const { curso, modulos } = resCurso.data;
     setCursoEditar({ ...curso, modulos, total_modulos: modulos.length });
     setTituloEdit(curso.titulo);
     setDescEdit(curso.descripcion || "");
+    setModulosDisponibles(resTodos.data.modulos);
+    setModuloAgregar(0);
+    setOrdenMod(modulos.length + 1);
     setModuloEditando(null);
     setSeccion("editarCurso");
+  } catch (error) {
+    console.error("Error al abrir editor:", error);
+    mostrarFeedback("err", "Error al cargar datos");
   }
+}
 
   // ── Guardar cambios del curso ──
   async function handleGuardarCurso(e: FormEvent) {
@@ -129,6 +142,7 @@ export default function AdminPanel() {
         titulo:   tituloModEdit,
         orden:    ordenModEdit,
         nivel_id: nivelModEdit,
+        curso_id: cursoEditar.id,
       });
       mostrarFeedback("ok", "Módulo actualizado");
       setModuloEditando(null);
@@ -330,53 +344,62 @@ export default function AdminPanel() {
               ))
             }
           </div>
-          {/* ── Agregar módulo al curso editado ── */}
-          <div className="form-card" style={{ marginTop: "1.5rem" }}>
-            <h3>Agregar módulo a este curso</h3>
-            <form onSubmit={async (e) => {
-              e.preventDefault();
-              if (!cursoEditar) return;
-              try {
-                await api.post(`/courses/${cursoEditar.id}/modulos`, {
-                  titulo:   tituloMod,
-                  orden:    ordenMod,
-                  nivel_id: nivelMod,
-                });
-                mostrarFeedback("ok", "Módulo agregado");
-                setTituloMod("");
-                setOrdenMod((n) => n + 1);
-                // Recargar módulos del curso
-                const res = await api.get(`/courses/${cursoEditar.id}`);
-                setCursoEditar((prev) => prev ? { ...prev, modulos: res.data.modulos } : prev);
-                cargarCursos();
-              } catch (err: any) {
-                mostrarFeedback("err", err?.response?.data?.error || "Error al agregar módulo");
-              }
-            }}>
-              <div className="campo">
-                <label className="campo-label">Título del módulo *</label>
-                <input type="text" className="campo-input"
-                  placeholder="Ej: Introducción a React"
-                  value={tituloMod} onChange={(e) => setTituloMod(e.target.value)}
-                  maxLength={150} required />
-              </div>
-              <div className="campo-fila">
-                <div className="campo">
-                  <label className="campo-label">Orden *</label>
-                  <input type="number" className="campo-input" min={1}
-                    value={ordenMod} onChange={(e) => setOrdenMod(Number(e.target.value))} required />
-                </div>
-                <div className="campo">
-                  <label className="campo-label">Nivel *</label>
-                  <select className="campo-input" value={nivelMod}
-                    onChange={(e) => setNivelMod(Number(e.target.value))}>
-                    {NIVELES.map((n) => <option key={n.id} value={n.id}>{n.nombre}</option>)}
-                  </select>
-                </div>
-              </div>
-              <button type="submit" className="boton-primario">➕ Agregar módulo</button>
-            </form>
-          </div>
+{/* ── Agregar módulo existente a este curso ── */}
+<div className="form-card" style={{ marginTop: "1.5rem" }}>
+  <h3>Agregar módulo existente a este curso</h3>
+  <form onSubmit={async (e) => {
+    e.preventDefault();
+    if (!cursoEditar || moduloAgregar === 0) {
+      mostrarFeedback("err", "Seleccioná un módulo");
+      return;
+    }
+    try {
+      await api.post(`/courses/${cursoEditar.id}/modulos`, {
+        modulo_id: moduloAgregar,
+        orden: ordenMod,
+      });
+      mostrarFeedback("ok", "Módulo agregado al curso");
+      setModuloAgregar(0);
+      setOrdenMod((n) => n + 1);
+      const res = await api.get(`/courses/${cursoEditar.id}`);
+      setCursoEditar((prev) => prev ? { ...prev, modulos: res.data.modulos } : prev);
+      cargarCursos();
+    } catch (err: any) {
+      mostrarFeedback("err", err?.response?.data?.error || "Error al agregar módulo");
+    }
+  }}>
+    <div className="campo">
+      <label className="campo-label">Módulo *</label>
+      <select 
+        className="campo-input" 
+        value={moduloAgregar}
+        onChange={(e) => setModuloAgregar(Number(e.target.value))} 
+        required
+      >
+        <option value={0}>-- Seleccioná un módulo --</option>
+        {modulosDisponibles
+          .filter((m) => !cursoEditar?.modulos?.some((cm) => cm.id === m.id))
+          .map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.titulo} ({NIVELES.find((n) => n.id === m.nivel_id)?.nombre || "Nivel"})
+            </option>
+          ))}
+      </select>
+    </div>
+    <div className="campo">
+      <label className="campo-label">Orden *</label>
+      <input 
+        type="number" 
+        className="campo-input" 
+        min={1}
+        value={ordenMod} 
+        onChange={(e) => setOrdenMod(Number(e.target.value))} 
+        required 
+      />
+    </div>
+    <button type="submit" className="boton-primario">➕ Agregar al curso</button>
+  </form>
+</div>
         </div>
       )}
 

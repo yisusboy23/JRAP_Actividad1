@@ -50,13 +50,13 @@ async function listarModulosDeCurso(req, res) {
       `SELECT
          m.id,
          m.titulo,
-         m.orden,
+         cm.orden,
          m.nivel_id,
          n.nombre AS nivel
        FROM modulos m
+       INNER JOIN curso_modulo cm ON cm.modulo_id = m.id AND cm.curso_id = @cursoId
        INNER JOIN niveles_modulo n ON n.id = m.nivel_id
-       WHERE m.curso_id = @cursoId
-       ORDER BY m.orden ASC`,
+       ORDER BY cm.orden ASC`,
       { cursoId: { type: sql.Int, value: cursoId } }
     );
 
@@ -78,29 +78,18 @@ async function crearModulo(req, res) {
       return res.status(400).json({ error: "cursoId inválido" });
     }
 
-    // Sanitizar inputs
     const titulo  = typeof req.body.titulo === "string"
       ? req.body.titulo.trim().substring(0, MAX_TITULO)
       : null;
     const orden   = parseInt(req.body.orden, 10);
     const nivelId = parseInt(req.body.nivel_id, 10);
 
-    // Validaciones
-    if (!titulo) {
-      return res.status(400).json({ error: "titulo es requerido" });
-    }
-    if (isNaN(orden) || orden < 1) {
-      return res.status(400).json({ error: "orden debe ser un número positivo" });
-    }
-
-    // Validación de nivel: whitelist desde constante (+ validación en DB como respaldo)
+    if (!titulo) return res.status(400).json({ error: "titulo es requerido" });
+    if (isNaN(orden) || orden < 1) return res.status(400).json({ error: "orden debe ser un número positivo" });
     if (isNaN(nivelId) || !NIVELES_VALIDOS.includes(nivelId)) {
-      return res.status(400).json({
-        error: "nivel_id inválido. Use 1 (Básico), 2 (Intermedio) o 3 (Avanzado)",
-      });
+      return res.status(400).json({ error: "nivel_id inválido. Use 1 (Básico), 2 (Intermedio) o 3 (Avanzado)" });
     }
 
-    // Verificar que el curso exista
     const resCurso = await query(
       `SELECT id FROM cursos WHERE id = @cursoId`,
       { cursoId: { type: sql.Int, value: cursoId } }
@@ -109,28 +98,37 @@ async function crearModulo(req, res) {
       return res.status(404).json({ error: "Curso no encontrado" });
     }
 
-    // INSERT parametrizado
-    const result = await query(
-      `INSERT INTO modulos (curso_id, titulo, orden, nivel_id)
+    // Insertar módulo SIN curso_id
+    const resModulo = await query(
+      `INSERT INTO modulos (titulo, nivel_id)
        OUTPUT INSERTED.id
-       VALUES (@cursoId, @titulo, @orden, @nivelId)`,
+       VALUES (@titulo, @nivelId)`,
       {
-        cursoId: { type: sql.Int,          value: cursoId  },
-        titulo:  { type: sql.VarChar(MAX_TITULO), value: titulo },
-        orden:   { type: sql.Int,          value: orden    },
-        nivelId: { type: sql.TinyInt,      value: nivelId  },
+        titulo:  { type: sql.VarChar(MAX_TITULO), value: titulo  },
+        nivelId: { type: sql.TinyInt,             value: nivelId },
       }
     );
 
-    res.status(201).json({
-      mensaje:  "Módulo creado correctamente",
-      moduloId: result.recordset[0].id,
-    });
+    const moduloId = resModulo.recordset[0].id;
+
+    // Vincular en curso_modulo
+    await query(
+      `INSERT INTO curso_modulo (curso_id, modulo_id, orden)
+       VALUES (@cursoId, @moduloId, @orden)`,
+      {
+        cursoId:  { type: sql.Int, value: cursoId  },
+        moduloId: { type: sql.Int, value: moduloId },
+        orden:    { type: sql.Int, value: orden    },
+      }
+    );
+
+    res.status(201).json({ mensaje: "Módulo creado correctamente", moduloId });
   } catch (err) {
     console.error("[moduloController] crearModulo:", err.message);
     res.status(500).json({ error: "Error al crear módulo" });
   }
 }
+
 
 // ─────────────────────────────────────────────
 // PUT /api/modulos/:moduloId
@@ -139,36 +137,44 @@ async function crearModulo(req, res) {
 async function actualizarModulo(req, res) {
   try {
     const moduloId = parseInt(req.params.moduloId, 10);
-    if (isNaN(moduloId) || moduloId <= 0) {
+    const cursoId  = parseInt(req.body.curso_id, 10);
+
+    if (isNaN(moduloId) || moduloId <= 0)
       return res.status(400).json({ error: "moduloId inválido" });
-    }
 
     const titulo  = typeof req.body.titulo === "string"
-      ? req.body.titulo.trim().substring(0, MAX_TITULO)
-      : null;
+      ? req.body.titulo.trim().substring(0, MAX_TITULO) : null;
     const orden   = parseInt(req.body.orden, 10);
     const nivelId = parseInt(req.body.nivel_id, 10);
 
     if (!titulo) return res.status(400).json({ error: "titulo es requerido" });
     if (isNaN(orden) || orden < 1) return res.status(400).json({ error: "orden inválido" });
-    if (isNaN(nivelId) || !NIVELES_VALIDOS.includes(nivelId)) {
+    if (isNaN(nivelId) || !NIVELES_VALIDOS.includes(nivelId))
       return res.status(400).json({ error: "nivel_id inválido" });
-    }
 
+    // Actualizar título y nivel en modulos
     const result = await query(
-      `UPDATE modulos
-       SET titulo = @titulo, orden = @orden, nivel_id = @nivelId
-       WHERE id = @moduloId`,
+      `UPDATE modulos SET titulo = @titulo, nivel_id = @nivelId WHERE id = @moduloId`,
       {
         moduloId: { type: sql.Int,               value: moduloId },
         titulo:   { type: sql.VarChar(MAX_TITULO), value: titulo  },
-        orden:    { type: sql.Int,               value: orden    },
-        nivelId:  { type: sql.TinyInt,           value: nivelId  },
+        nivelId:  { type: sql.TinyInt,            value: nivelId },
       }
     );
 
-    if (result.rowsAffected[0] === 0) {
+    if (result.rowsAffected[0] === 0)
       return res.status(404).json({ error: "Módulo no encontrado" });
+
+    // Actualizar orden en curso_modulo (si viene curso_id)
+    if (!isNaN(cursoId) && cursoId > 0) {
+      await query(
+        `UPDATE curso_modulo SET orden = @orden WHERE curso_id = @cursoId AND modulo_id = @moduloId`,
+        {
+          cursoId:  { type: sql.Int, value: cursoId  },
+          moduloId: { type: sql.Int, value: moduloId },
+          orden:    { type: sql.Int, value: orden    },
+        }
+      );
     }
 
     res.json({ mensaje: "Módulo actualizado correctamente" });
@@ -178,9 +184,25 @@ async function actualizarModulo(req, res) {
   }
 }
 
+async function listarTodosLosModulos(req, res) {
+  try {
+    const result = await query(
+      `SELECT m.id, m.titulo, m.nivel_id, n.nombre AS nivel
+       FROM modulos m
+       INNER JOIN niveles_modulo n ON n.id = m.nivel_id
+       ORDER BY m.titulo ASC`
+    );
+    res.json({ modulos: result.recordset });
+  } catch (err) {
+    console.error("[moduloController] listarTodosLosModulos:", err.message);
+    res.status(500).json({ error: "Error al obtener módulos" });
+  }
+}
+
 module.exports = {
   listarNiveles,
   listarModulosDeCurso,
   crearModulo,
   actualizarModulo,
+  listarTodosLosModulos,
 };
