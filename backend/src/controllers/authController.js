@@ -34,11 +34,10 @@ async function login(req, res) {
     if (!coincide)
       return res.status(401).json({ error: "Credenciales inválidas" });
 
-    const token = jwt.sign(
-      { id: docente.id, nombre: docente.nombre, apellido: docente.apellido, email: docente.email },
-      JWT_SECRET,
-      { expiresIn: JWT_EXPIRES }
-    );
+const token = jwt.sign(
+  { id: docente.id, nombre: docente.nombre, apellido: docente.apellido, email: docente.email },
+  JWT_SECRET
+);
 
     res.json({
       token,

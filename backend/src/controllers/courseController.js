@@ -18,7 +18,7 @@ async function listarCursos(req, res) {
          u.nombre AS instructor,
          COUNT(cm.modulo_id) AS total_modulos
        FROM cursos c
-       LEFT JOIN usuarios u ON u.id = c.creado_por
+       LEFT JOIN docentes u ON u.id = c.creado_por
        LEFT JOIN curso_modulo cm ON cm.curso_id = c.id
        GROUP BY c.id, c.titulo, c.descripcion, u.nombre
        ORDER BY c.id ASC`
@@ -33,12 +33,12 @@ async function listarCursos(req, res) {
 
 async function obtenerCurso(req, res) {
   try {
-    const cursoId    = parseInt(req.params.id);
-    const usuarioId  = req.usuario?.id; 
+    const cursoId = parseInt(req.params.id);
+    const usuarioId = req.usuario?.id;
     const resCurso = await query(
       `SELECT c.id, c.titulo, c.descripcion, u.nombre AS instructor
        FROM cursos c
-       LEFT JOIN usuarios u ON u.id = c.creado_por
+       LEFT JOIN docentes u ON u.id = c.creado_por
        WHERE c.id = @cid`,
       { cid: { type: sql.Int, value: cursoId } }
     );
@@ -49,23 +49,21 @@ async function obtenerCurso(req, res) {
 
     const resModulos = await query(
       `SELECT 
-         m.id, 
-         m.titulo, 
-         cm.orden,
-         ISNULL(p.completado, 0) AS completado
-       FROM modulos m
-       INNER JOIN curso_modulo cm ON cm.modulo_id = m.id AND cm.curso_id = @cid
-       LEFT  JOIN progreso p      ON p.modulo_id = m.id AND p.usuario_id = @uid
-       ORDER BY cm.orden ASC`,
+     m.id, 
+     m.titulo,
+     ISNULL(p.completado, 0) AS completado
+   FROM modulos m
+   INNER JOIN curso_modulo cm ON cm.modulo_id = m.id AND cm.curso_id = @cid
+   LEFT  JOIN progreso p      ON p.modulo_id = m.id AND p.usuario_id = @uid`,
       {
-        cid: { type: sql.Int, value: cursoId  },
+        cid: { type: sql.Int, value: cursoId },
         uid: { type: sql.Int, value: usuarioId || 0 },
       }
     );
 
-    const modulos      = resModulos.recordset;
-    const completados  = modulos.filter((m) => m.completado).length;
-    const porcentaje   = calcularPorcentaje(completados, modulos.length);
+    const modulos = resModulos.recordset;
+    const completados = modulos.filter((m) => m.completado).length;
+    const porcentaje = calcularPorcentaje(completados, modulos.length);
 
     res.json({
       curso: resCurso.recordset[0],
@@ -85,7 +83,7 @@ async function obtenerCurso(req, res) {
 async function crearCurso(req, res) {
   try {
     const { titulo, descripcion } = req.body;
-    const creadoPor =  req.usuario?.id; 
+    const creadoPor = req.usuario?.id;
 
     if (!titulo) {
       return res.status(400).json({ error: "El título es requerido" });
@@ -96,9 +94,9 @@ async function crearCurso(req, res) {
        OUTPUT INSERTED.id
        VALUES (@titulo, @descripcion, @creadoPor)`,
       {
-        titulo:      { type: sql.VarChar, value: titulo       },
+        titulo: { type: sql.VarChar, value: titulo },
         descripcion: { type: sql.VarChar, value: descripcion || null },
-        creadoPor:   { type: sql.Int,     value: creadoPor   },
+        creadoPor: { type: sql.Int, value: creadoPor },
       }
     );
 
@@ -114,11 +112,8 @@ async function crearCurso(req, res) {
 
 async function agregarModulo(req, res) {
   try {
-    const cursoId  = parseInt(req.params.id);
-    const { titulo, orden, nivel_id, modulo_id } = req.body;  // ← modulo_id nuevo
-
-    if (orden === undefined)
-      return res.status(400).json({ error: "orden es requerido" });
+    const cursoId = parseInt(req.params.id);
+    const { titulo, nivel_id, modulo_id } = req.body;  // ← modulo_id nuevo
 
     const resCurso = await query(
       `SELECT id FROM cursos WHERE id = @cid`,
@@ -145,19 +140,18 @@ async function agregarModulo(req, res) {
       const resModulo = await query(
         `INSERT INTO modulos (titulo, nivel_id) OUTPUT INSERTED.id VALUES (@titulo, @nivelId)`,
         {
-          titulo:  { type: sql.VarChar, value: titulo },
-          nivelId: { type: sql.Int,     value: nivel_id || 1 },
+          titulo: { type: sql.VarChar, value: titulo },
+          nivelId: { type: sql.Int, value: nivel_id || 1 },
         }
       );
       moduloId = resModulo.recordset[0].id;
     }
 
     await query(
-      `INSERT INTO curso_modulo (curso_id, modulo_id, orden) VALUES (@cid, @mid, @orden)`,
+      `INSERT INTO curso_modulo (curso_id, modulo_id) VALUES (@cid, @mid)`,
       {
-        cid:   { type: sql.Int, value: cursoId  },
-        mid:   { type: sql.Int, value: moduloId },
-        orden: { type: sql.Int, value: orden    },
+        cid: { type: sql.Int, value: cursoId },
+        mid: { type: sql.Int, value: moduloId },
       }
     );
 
@@ -170,21 +164,21 @@ async function agregarModulo(req, res) {
 
 async function verificarCursoCompleto(req, res) {
   try {
-    const cursoId   = parseInt(req.params.id);
+    const cursoId = parseInt(req.params.id);
     const usuarioId = parseInt(req.params.usuarioId);
 
-    const result = await query(
-      `SELECT 
-         COUNT(m.id) AS total, 
-         SUM(ISNULL(p.completado, 0)) AS completados
-       FROM modulos m
-       INNER JOIN curso_modulo cm ON cm.modulo_id = m.id AND cm.curso_id = @cid
-       LEFT  JOIN progreso p      ON p.modulo_id = m.id AND p.usuario_id = @uid`,
-      {
-        cid: { type: sql.Int, value: cursoId   },
-        uid: { type: sql.Int, value: usuarioId },
-      }
-    );
+const result = await query(
+  `SELECT 
+     COUNT(m.id) AS total, 
+     SUM(ISNULL(p.completado, 0)) AS completados
+   FROM modulos m
+   INNER JOIN curso_modulo cm ON cm.modulo_id = m.id AND cm.curso_id = @cid
+   LEFT  JOIN progreso p      ON p.modulo_id = m.id AND p.usuario_id = @uid`,
+  {
+    cid: { type: sql.Int, value: cursoId   },
+    uid: { type: sql.Int, value: usuarioId },
+  }
+);
 
     const { total, completados } = result.recordset[0];
     const porcentaje = calcularPorcentaje(completados, total);
@@ -290,17 +284,14 @@ async function eliminarCurso(req, res) {
 async function actualizarModuloDeCurso(req, res) {
   try {
     const moduloId = parseInt(req.params.moduloId, 10);
-    const titulo   = typeof req.body.titulo === "string" ? req.body.titulo.trim() : null;
-    const orden    = parseInt(req.body.orden, 10);
-    const nivelId  = parseInt(req.body.nivel_id, 10);
-    const cursoId  = parseInt(req.body.curso_id, 10);
+    const titulo = typeof req.body.titulo === "string" ? req.body.titulo.trim() : null;
+    const nivelId = parseInt(req.body.nivel_id, 10);
+    const cursoId = parseInt(req.body.curso_id, 10);
 
     if (isNaN(moduloId) || moduloId <= 0)
       return res.status(400).json({ error: "moduloId inválido" });
     if (!titulo)
       return res.status(400).json({ error: "titulo es requerido" });
-    if (isNaN(orden) || orden < 1)
-      return res.status(400).json({ error: "orden inválido" });
     if (isNaN(nivelId) || ![1, 2, 3].includes(nivelId))
       return res.status(400).json({ error: "nivel_id inválido" });
 
@@ -308,24 +299,11 @@ async function actualizarModuloDeCurso(req, res) {
     await query(
       `UPDATE modulos SET titulo = @titulo, nivel_id = @nivelId WHERE id = @id`,
       {
-        id:      { type: sql.Int,     value: moduloId },
-        titulo:  { type: sql.VarChar, value: titulo   },
-        nivelId: { type: sql.TinyInt, value: nivelId  },
+        id: { type: sql.Int, value: moduloId },
+        titulo: { type: sql.VarChar, value: titulo },
+        nivelId: { type: sql.TinyInt, value: nivelId },
       }
     );
-
-    // Actualizar orden en curso_modulo (si se pasa curso_id)
-    if (cursoId && !isNaN(cursoId)) {
-      await query(
-        `UPDATE curso_modulo SET orden = @orden WHERE curso_id = @cid AND modulo_id = @mid`,
-        {
-          cid:   { type: sql.Int, value: cursoId },
-          mid:   { type: sql.Int, value: moduloId },
-          orden: { type: sql.Int, value: orden },
-        }
-      );
-    }
-
     res.json({ mensaje: "Módulo actualizado correctamente" });
   } catch (error) {
     console.error("Error al actualizar módulo:", error);
@@ -336,7 +314,7 @@ async function actualizarModuloDeCurso(req, res) {
 async function eliminarModuloDeCurso(req, res) {
   try {
     const moduloId = parseInt(req.params.moduloId, 10);
-    const cursoId  = parseInt(req.params.id, 10); // si viene de ruta /cursos/:id/modulos/:moduloId
+    const cursoId = parseInt(req.params.id, 10); // si viene de ruta /cursos/:id/modulos/:moduloId
 
     // Eliminar progreso del módulo
     await query(
@@ -385,6 +363,25 @@ async function eliminarModuloDeCurso(req, res) {
   }
 }
 
+async function desvincularModulo(req, res) {
+  try {
+    const moduloId = parseInt(req.params.moduloId, 10);
+    const cursoId = parseInt(req.params.cursoId, 10);
+
+    await query(
+      `DELETE FROM curso_modulo WHERE curso_id = @cid AND modulo_id = @mid`,
+      {
+        cid: { type: sql.Int, value: cursoId },
+        mid: { type: sql.Int, value: moduloId },
+      }
+    );
+
+    res.json({ mensaje: "Módulo desvinculado correctamente" });
+  } catch (error) {
+    res.status(500).json({ error: "Error al desvincular módulo" });
+  }
+}
+
 module.exports = {
   listarCursos,
   obtenerCurso,
@@ -396,4 +393,5 @@ module.exports = {
   eliminarCurso,
   actualizarModuloDeCurso,
   eliminarModuloDeCurso,
+  desvincularModulo,
 };

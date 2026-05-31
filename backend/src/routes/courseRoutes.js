@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const { verificarToken } = require("../middlewares/authMiddleware"); // ← agregar
 
 const {
   listarCursos,
@@ -11,20 +12,21 @@ const {
   eliminarCurso,
   actualizarModuloDeCurso,
   eliminarModuloDeCurso,
+  desvincularModulo,
 } = require("../controllers/courseController");
 
-// ── EXISTENTES ──
+// Rutas públicas (lectura)
 router.get("/", listarCursos);
 router.get("/:id", obtenerCurso);
-router.post("/", crearCurso);
-router.post("/:id/modulos", agregarModulo);
 router.get("/:id/progreso/:usuarioId", verificarCursoCompleto);
+router.delete("/:cursoId/desvincular/:moduloId", verificarToken, desvincularModulo);
 
-// ── NUEVAS FUNCIONES ──
-router.put("/:id", actualizarCurso);
-router.delete("/:id", eliminarCurso);
-
-router.put("/:cursoId/modulos/:moduloId", actualizarModuloDeCurso);
-router.delete("/:cursoId/modulos/:moduloId", eliminarModuloDeCurso);
+// Rutas protegidas (escritura) — requieren login de docente
+router.post("/", verificarToken, crearCurso);
+router.post("/:id/modulos", verificarToken, agregarModulo);
+router.put("/:id", verificarToken, actualizarCurso);
+router.delete("/:id", verificarToken, eliminarCurso);
+router.put("/:cursoId/modulos/:moduloId", verificarToken, actualizarModuloDeCurso);
+router.delete("/:cursoId/modulos/:moduloId", verificarToken, eliminarModuloDeCurso);
 
 module.exports = router;

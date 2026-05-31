@@ -22,7 +22,7 @@ interface CursoDetalle extends Curso {
   modulos: Modulo[];
 }
 
-type Seccion = "cursos" | "crearCurso" | "crearModulo" | "crearEstudiante" | "editarCurso";
+type Seccion = "cursos" | "modulos" | "crearCurso" | "crearModulo" | "crearEstudiante" | "editarCurso";
 
 const NIVELES = [
   { id: 1, nombre: "Básico"     },
@@ -37,6 +37,7 @@ export default function AdminPanel() {
   const [cursos,   setCursos]   = useState<Curso[]>([]);
   const [seccion,  setSeccion]  = useState<Seccion>("cursos");
   const [feedback, setFeedback] = useState<{ tipo: "ok" | "err"; msg: string } | null>(null);
+  const [todosModulos, setTodosModulos] = useState<Modulo[]>([]);
 
   // Crear curso
   const [tituloCurso, setTituloCurso] = useState("");
@@ -45,7 +46,6 @@ export default function AdminPanel() {
   // Crear módulo
   const [cursoSelec, setCursoSelec] = useState<number>(0);
   const [tituloMod,  setTituloMod]  = useState("");
-  const [ordenMod,   setOrdenMod]   = useState(1);
   const [nivelMod,   setNivelMod]   = useState(1);
 
   // Crear estudiante
@@ -62,15 +62,33 @@ const [moduloAgregar, setModuloAgregar] = useState<number>(0);
   const [descEdit,       setDescEdit]       = useState("");
   const [moduloEditando, setModuloEditando] = useState<number | null>(null);
   const [tituloModEdit,  setTituloModEdit]  = useState("");
-  const [ordenModEdit,   setOrdenModEdit]   = useState(1);
   const [nivelModEdit,   setNivelModEdit]   = useState(1);
 
-  useEffect(() => { cargarCursos(); }, []);
+useEffect(() => { 
+  cargarCursos(); 
+  cargarModulos();
+}, []);
 
   async function cargarCursos() {
     const res = await api.get("/courses");
     setCursos(res.data.cursos);
   }
+  async function cargarModulos() {
+  const res = await api.get("/modulos/todos");
+  setTodosModulos(res.data.modulos);
+}
+
+async function handleEliminarModuloCompleto(moduloId: number) {
+  if (!confirm("¿Eliminar este módulo permanentemente?")) return;
+  try {
+    await api.delete(`/courses/0/modulos/${moduloId}`);
+    mostrarFeedback("ok", "Módulo eliminado");
+    cargarModulos();
+    cargarCursos(); // para actualizar también la lista de cursos
+  } catch (err: any) {
+    mostrarFeedback("err", err?.response?.data?.error || "Error al eliminar módulo");
+  }
+}
 
   function mostrarFeedback(tipo: "ok" | "err", msg: string) {
     setFeedback({ tipo, msg });
@@ -90,7 +108,6 @@ async function abrirEditorCurso(cursoId: number) {
     setDescEdit(curso.descripcion || "");
     setModulosDisponibles(resTodos.data.modulos);
     setModuloAgregar(0);
-    setOrdenMod(modulos.length + 1);
     setModuloEditando(null);
     setSeccion("editarCurso");
   } catch (error) {
@@ -130,7 +147,6 @@ async function abrirEditorCurso(cursoId: number) {
   function iniciarEditarModulo(mod: Modulo) {
     setModuloEditando(mod.id);
     setTituloModEdit(mod.titulo);
-    setOrdenModEdit(mod.orden);
     setNivelModEdit(mod.nivel_id);
   }
 
@@ -140,7 +156,6 @@ async function abrirEditorCurso(cursoId: number) {
     try {
       await api.put(`/courses/${cursoEditar.id}/modulos/${moduloId}`, {
         titulo:   tituloModEdit,
-        orden:    ordenModEdit,
         nivel_id: nivelModEdit,
         curso_id: cursoEditar.id,
       });
@@ -158,7 +173,7 @@ async function abrirEditorCurso(cursoId: number) {
     if (!cursoEditar) return;
     if (!confirm("¿Eliminar este módulo?")) return;
     try {
-      await api.delete(`/courses/${cursoEditar.id}/modulos/${moduloId}`);
+      await api.delete(`/courses/${cursoEditar.id}/desvincular/${moduloId}`);
       mostrarFeedback("ok", "Módulo eliminado");
       setCursoEditar((prev) =>
         prev ? { ...prev, modulos: prev.modulos.filter((m) => m.id !== moduloId) } : prev
@@ -186,10 +201,11 @@ async function abrirEditorCurso(cursoId: number) {
     if (cursoSelec === 0) return mostrarFeedback("err", "Seleccioná un curso");
     try {
       const res = await api.post(`/courses/${cursoSelec}/modulos`, {
-        titulo: tituloMod, orden: ordenMod, nivel_id: nivelMod,
-      });
+            titulo: tituloMod,
+            nivel_id: nivelMod,
+          });
       mostrarFeedback("ok", `Módulo creado (ID: ${res.data.moduloId})`);
-      setTituloMod(""); setOrdenMod((n) => n + 1);
+      setTituloMod("");
       cargarCursos();
     } catch (err: any) {
       mostrarFeedback("err", err?.response?.data?.error || "Error al crear módulo");
@@ -227,12 +243,12 @@ async function abrirEditorCurso(cursoId: number) {
 
       {/* Tabs */}
       <div className="admin-tabs">
-        {(["cursos", "crearCurso", "crearModulo", "crearEstudiante"] as Seccion[]).map((s) => (
+          {(["cursos", "modulos", "crearCurso", "crearModulo", "crearEstudiante"] as Seccion[]).map((s) => (
           <button key={s}
             className={`tab${seccion === s ? " tab-activo" : ""}`}
             onClick={() => { setSeccion(s); setModuloEditando(null); }}
           >
-{{ cursos: "📚 Cursos", crearCurso: "➕ Nuevo curso", crearModulo: "📝 Nuevo módulo", crearEstudiante: "🧑 Nuevo estudiante", editarCurso: "✏️ Editar" }[s]}
+            {{ cursos: "📚 Cursos", modulos: "📝 Módulos", crearCurso: "➕ Nuevo curso", crearModulo: "📝 Nuevo módulo", crearEstudiante: "🧑 Nuevo estudiante", editarCurso: "✏️ Editar" }[s]}
           </button>
         ))}
         {seccion === "editarCurso" && cursoEditar && (
@@ -311,9 +327,6 @@ async function abrirEditorCurso(cursoId: number) {
                         value={tituloModEdit} onChange={(e) => setTituloModEdit(e.target.value)}
                         placeholder="Título" />
                       <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-                        <input type="number" className="campo-input" style={{ width: "80px" }}
-                          value={ordenModEdit} min={1}
-                          onChange={(e) => setOrdenModEdit(Number(e.target.value))} />
                         <select className="campo-input"
                           value={nivelModEdit} onChange={(e) => setNivelModEdit(Number(e.target.value))}>
                           {NIVELES.map((n) => <option key={n.id} value={n.id}>{n.nombre}</option>)}
@@ -356,11 +369,9 @@ async function abrirEditorCurso(cursoId: number) {
     try {
       await api.post(`/courses/${cursoEditar.id}/modulos`, {
         modulo_id: moduloAgregar,
-        orden: ordenMod,
       });
       mostrarFeedback("ok", "Módulo agregado al curso");
       setModuloAgregar(0);
-      setOrdenMod((n) => n + 1);
       const res = await api.get(`/courses/${cursoEditar.id}`);
       setCursoEditar((prev) => prev ? { ...prev, modulos: res.data.modulos } : prev);
       cargarCursos();
@@ -386,23 +397,33 @@ async function abrirEditorCurso(cursoId: number) {
           ))}
       </select>
     </div>
-    <div className="campo">
-      <label className="campo-label">Orden *</label>
-      <input 
-        type="number" 
-        className="campo-input" 
-        min={1}
-        value={ordenMod} 
-        onChange={(e) => setOrdenMod(Number(e.target.value))} 
-        required 
-      />
-    </div>
     <button type="submit" className="boton-primario">➕ Agregar al curso</button>
   </form>
 </div>
         </div>
       )}
-
+      {/* ── Lista de módulos ── */}
+      {seccion === "modulos" && (
+        <div className="form-card">
+          <h3>Lista de módulos</h3>
+          {todosModulos.length === 0
+            ? <p className="vacio">No hay módulos.</p>
+            : todosModulos.map((mod) => (
+                <div key={mod.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #e5e7eb", padding: "0.75rem 0" }}>
+                  <span>
+                    <strong>{mod.titulo}</strong>
+                    <span style={{ marginLeft: "0.5rem", fontSize: "0.8rem", color: "#6b7280" }}>
+                      ({NIVELES.find((n) => n.id === mod.nivel_id)?.nombre || "Sin nivel"})
+                    </span>
+                  </span>
+                  <button className="boton-peligro" onClick={() => handleEliminarModuloCompleto(mod.id)}>
+                    🗑️ Eliminar
+                  </button>
+                </div>
+              ))
+          }
+        </div>
+      )}
       {/* ── Crear curso ── */}
       {seccion === "crearCurso" && (
         <div className="form-card">
@@ -449,11 +470,6 @@ async function abrirEditorCurso(cursoId: number) {
                 maxLength={150} required />
             </div>
             <div className="campo-fila">
-              <div className="campo">
-                <label className="campo-label">Orden *</label>
-                <input type="number" className="campo-input" min={1}
-                  value={ordenMod} onChange={(e) => setOrdenMod(Number(e.target.value))} required />
-              </div>
               <div className="campo">
                 <label className="campo-label">Nivel *</label>
                 <select className="campo-input" value={nivelMod}
