@@ -1,5 +1,4 @@
 import { useEffect, useState, FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
 
@@ -31,8 +30,7 @@ const NIVELES = [
 ];
 
 export default function AdminPanel() {
-  const { docente, logout } = useAuth();
-  const navigate = useNavigate();
+const { docente } = useAuth();
 
   const [cursos,   setCursos]   = useState<Curso[]>([]);
   const [seccion,  setSeccion]  = useState<Seccion>("cursos");
@@ -232,9 +230,6 @@ export default function AdminPanel() {
             Bienvenido/a, <strong>{docente?.nombre} {docente?.apellido}</strong>
           </p>
         </div>
-        <button className="boton-secundario" onClick={() => { logout(); navigate("/login"); }}>
-          Cerrar sesión
-        </button>
       </div>
 
       {/* Tabs */}

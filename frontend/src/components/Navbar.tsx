@@ -2,15 +2,15 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 const LINKS_PUBLICOS = [
-  { ruta: "/",        etiqueta: "Dashboard" },
-  { ruta: "/ranking", etiqueta: "Ranking"   },
-  { ruta: "/badges",  etiqueta: "Insignias" },
+  { ruta: "/", etiqueta: "Dashboard" },
+  { ruta: "/ranking", etiqueta: "Ranking" },
+  { ruta: "/badges", etiqueta: "Insignias" },
 ];
 
 export default function Navbar() {
-  const { pathname }        = useLocation();
+  const { pathname } = useLocation();
   const { docente, logout } = useAuth();
-  const navigate            = useNavigate();
+  const navigate = useNavigate();
 
   return (
     <nav className="nav">
@@ -36,7 +36,12 @@ export default function Navbar() {
             </Link>
             <button
               className="nav-link nav-link-btn"
-              onClick={() => { logout(); navigate("/"); }}
+              onClick={() => {
+                if (confirm("¿Desea cerrar sesión?")) {
+                  logout();
+                  navigate("/");
+                }
+              }}
             >
               Salir
             </button>
