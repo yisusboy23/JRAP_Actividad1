@@ -55,68 +55,67 @@ export default function AdminPanel() {
   const [ciEst,    setCiEst]    = useState("");
 
   // Editar curso
-  const [cursoEditar,    setCursoEditar]    = useState<CursoDetalle | null>(null);
+  const [cursoEditar,        setCursoEditar]        = useState<CursoDetalle | null>(null);
   const [modulosDisponibles, setModulosDisponibles] = useState<Modulo[]>([]);
-const [moduloAgregar, setModuloAgregar] = useState<number>(0);
-  const [tituloEdit,     setTituloEdit]     = useState("");
-  const [descEdit,       setDescEdit]       = useState("");
-  const [moduloEditando, setModuloEditando] = useState<number | null>(null);
-  const [tituloModEdit,  setTituloModEdit]  = useState("");
-  const [nivelModEdit,   setNivelModEdit]   = useState(1);
+  const [moduloAgregar,      setModuloAgregar]      = useState<number>(0);
+  const [tituloEdit,         setTituloEdit]         = useState("");
+  const [descEdit,           setDescEdit]           = useState("");
+  const [moduloEditando,     setModuloEditando]     = useState<number | null>(null);
+  const [tituloModEdit,      setTituloModEdit]      = useState("");
+  const [nivelModEdit,       setNivelModEdit]       = useState(1);
 
-useEffect(() => { 
-  cargarCursos(); 
-  cargarModulos();
-}, []);
+  useEffect(() => {
+    cargarCursos();
+    cargarModulos();
+  }, []);
 
   async function cargarCursos() {
     const res = await api.get("/courses");
     setCursos(res.data.cursos);
   }
-  async function cargarModulos() {
-  const res = await api.get("/modulos/todos");
-  setTodosModulos(res.data.modulos);
-}
 
-async function handleEliminarModuloCompleto(moduloId: number) {
-  if (!confirm("¿Eliminar este módulo permanentemente?")) return;
-  try {
-    await api.delete(`/courses/0/modulos/${moduloId}`);
-    mostrarFeedback("ok", "Módulo eliminado");
-    cargarModulos();
-    cargarCursos(); // para actualizar también la lista de cursos
-  } catch (err: any) {
-    mostrarFeedback("err", err?.response?.data?.error || "Error al eliminar módulo");
+  async function cargarModulos() {
+    const res = await api.get("/modulos/todos");
+    setTodosModulos(res.data.modulos);
   }
-}
+
+  async function handleEliminarModuloCompleto(moduloId: number) {
+    if (!confirm("¿Eliminar este módulo permanentemente?")) return;
+    try {
+      await api.delete(`/courses/0/modulos/${moduloId}`);
+      mostrarFeedback("ok", "Módulo eliminado");
+      cargarModulos();
+      cargarCursos();
+    } catch (err: any) {
+      mostrarFeedback("err", err?.response?.data?.error || "Error al eliminar módulo");
+    }
+  }
 
   function mostrarFeedback(tipo: "ok" | "err", msg: string) {
     setFeedback({ tipo, msg });
     setTimeout(() => setFeedback(null), 4000);
   }
 
-  // ── Abrir editor de curso ──
-async function abrirEditorCurso(cursoId: number) {
-  try {
-    const [resCurso, resTodos] = await Promise.all([
-      api.get(`/courses/${cursoId}`),
-      api.get(`/modulos/todos`),
-    ]);
-    const { curso, modulos } = resCurso.data;
-    setCursoEditar({ ...curso, modulos, total_modulos: modulos.length });
-    setTituloEdit(curso.titulo);
-    setDescEdit(curso.descripcion || "");
-    setModulosDisponibles(resTodos.data.modulos);
-    setModuloAgregar(0);
-    setModuloEditando(null);
-    setSeccion("editarCurso");
-  } catch (error) {
-    console.error("Error al abrir editor:", error);
-    mostrarFeedback("err", "Error al cargar datos");
+  async function abrirEditorCurso(cursoId: number) {
+    try {
+      const [resCurso, resTodos] = await Promise.all([
+        api.get(`/courses/${cursoId}`),
+        api.get(`/modulos/todos`),
+      ]);
+      const { curso, modulos } = resCurso.data;
+      setCursoEditar({ ...curso, modulos, total_modulos: modulos.length });
+      setTituloEdit(curso.titulo);
+      setDescEdit(curso.descripcion || "");
+      setModulosDisponibles(resTodos.data.modulos);
+      setModuloAgregar(0);
+      setModuloEditando(null);
+      setSeccion("editarCurso");
+    } catch (error) {
+      console.error("Error al abrir editor:", error);
+      mostrarFeedback("err", "Error al cargar datos");
+    }
   }
-}
 
-  // ── Guardar cambios del curso ──
   async function handleGuardarCurso(e: FormEvent) {
     e.preventDefault();
     if (!cursoEditar) return;
@@ -130,7 +129,6 @@ async function abrirEditorCurso(cursoId: number) {
     }
   }
 
-  // ── Eliminar curso ──
   async function handleEliminarCurso(id: number) {
     if (!confirm("¿Eliminar este curso y todos sus módulos?")) return;
     try {
@@ -143,14 +141,12 @@ async function abrirEditorCurso(cursoId: number) {
     }
   }
 
-  // ── Iniciar edición de módulo ──
   function iniciarEditarModulo(mod: Modulo) {
     setModuloEditando(mod.id);
     setTituloModEdit(mod.titulo);
     setNivelModEdit(mod.nivel_id);
   }
 
-  // ── Guardar módulo editado ──
   async function handleGuardarModulo(moduloId: number) {
     if (!cursoEditar) return;
     try {
@@ -168,13 +164,12 @@ async function abrirEditorCurso(cursoId: number) {
     }
   }
 
-  // ── Eliminar módulo ──
   async function handleEliminarModulo(moduloId: number) {
     if (!cursoEditar) return;
     if (!confirm("¿Eliminar este módulo?")) return;
     try {
       await api.delete(`/courses/${cursoEditar.id}/desvincular/${moduloId}`);
-      mostrarFeedback("ok", "Módulo eliminado");
+      mostrarFeedback("ok", "Módulo desvinculado del curso");
       setCursoEditar((prev) =>
         prev ? { ...prev, modulos: prev.modulos.filter((m) => m.id !== moduloId) } : prev
       );
@@ -201,12 +196,13 @@ async function abrirEditorCurso(cursoId: number) {
     if (cursoSelec === 0) return mostrarFeedback("err", "Seleccioná un curso");
     try {
       const res = await api.post(`/courses/${cursoSelec}/modulos`, {
-            titulo: tituloMod,
-            nivel_id: nivelMod,
-          });
+        titulo:   tituloMod,
+        nivel_id: nivelMod,
+      });
       mostrarFeedback("ok", `Módulo creado (ID: ${res.data.moduloId})`);
       setTituloMod("");
       cargarCursos();
+      cargarModulos();
     } catch (err: any) {
       mostrarFeedback("err", err?.response?.data?.error || "Error al crear módulo");
     }
@@ -243,7 +239,7 @@ async function abrirEditorCurso(cursoId: number) {
 
       {/* Tabs */}
       <div className="admin-tabs">
-          {(["cursos", "modulos", "crearCurso", "crearModulo", "crearEstudiante"] as Seccion[]).map((s) => (
+        {(["cursos", "modulos", "crearCurso", "crearModulo", "crearEstudiante"] as Seccion[]).map((s) => (
           <button key={s}
             className={`tab${seccion === s ? " tab-activo" : ""}`}
             onClick={() => { setSeccion(s); setModuloEditando(null); }}
@@ -272,7 +268,7 @@ async function abrirEditorCurso(cursoId: number) {
                 <div key={c.id} className="tarjeta">
                   <h3 className="nombre-curso">{c.titulo}</h3>
                   <p className="descripcion">{c.descripcion || "Sin descripción"}</p>
-                  <p className="instructor">Instructor: {c.instructor || "—"}</p>
+                  <p className="instructor">Instructor: {c.instructor}</p>
                   <span className="badge-fecha">{c.total_modulos} módulo(s)</span>
                   <div style={{ marginTop: "0.75rem", display: "flex", gap: "0.5rem" }}>
                     <button className="boton-secundario" onClick={() => abrirEditorCurso(c.id)}>
@@ -313,7 +309,6 @@ async function abrirEditorCurso(cursoId: number) {
               </div>
             </form>
           </div>
-
 
           <div className="form-card">
             <h3>Módulos del curso</h3>
@@ -357,51 +352,53 @@ async function abrirEditorCurso(cursoId: number) {
               ))
             }
           </div>
-{/* ── Agregar módulo existente a este curso ── */}
-<div className="form-card" style={{ marginTop: "1.5rem" }}>
-  <h3>Agregar módulo existente a este curso</h3>
-  <form onSubmit={async (e) => {
-    e.preventDefault();
-    if (!cursoEditar || moduloAgregar === 0) {
-      mostrarFeedback("err", "Seleccioná un módulo");
-      return;
-    }
-    try {
-      await api.post(`/courses/${cursoEditar.id}/modulos`, {
-        modulo_id: moduloAgregar,
-      });
-      mostrarFeedback("ok", "Módulo agregado al curso");
-      setModuloAgregar(0);
-      const res = await api.get(`/courses/${cursoEditar.id}`);
-      setCursoEditar((prev) => prev ? { ...prev, modulos: res.data.modulos } : prev);
-      cargarCursos();
-    } catch (err: any) {
-      mostrarFeedback("err", err?.response?.data?.error || "Error al agregar módulo");
-    }
-  }}>
-    <div className="campo">
-      <label className="campo-label">Módulo *</label>
-      <select 
-        className="campo-input" 
-        value={moduloAgregar}
-        onChange={(e) => setModuloAgregar(Number(e.target.value))} 
-        required
-      >
-        <option value={0}>-- Seleccioná un módulo --</option>
-        {modulosDisponibles
-          .filter((m) => !cursoEditar?.modulos?.some((cm) => cm.id === m.id))
-          .map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.titulo} ({NIVELES.find((n) => n.id === m.nivel_id)?.nombre || "Nivel"})
-            </option>
-          ))}
-      </select>
-    </div>
-    <button type="submit" className="boton-primario">➕ Agregar al curso</button>
-  </form>
-</div>
+
+          {/* ── Agregar módulo existente a este curso ── */}
+          <div className="form-card" style={{ marginTop: "1.5rem" }}>
+            <h3>Agregar módulo existente a este curso</h3>
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              if (!cursoEditar || moduloAgregar === 0) {
+                mostrarFeedback("err", "Seleccioná un módulo");
+                return;
+              }
+              try {
+                await api.post(`/courses/${cursoEditar.id}/modulos`, {
+                  modulo_id: moduloAgregar,
+                });
+                mostrarFeedback("ok", "Módulo agregado al curso");
+                setModuloAgregar(0);
+                const res = await api.get(`/courses/${cursoEditar.id}`);
+                setCursoEditar((prev) => prev ? { ...prev, modulos: res.data.modulos } : prev);
+                cargarCursos();
+              } catch (err: any) {
+                mostrarFeedback("err", err?.response?.data?.error || "Error al agregar módulo");
+              }
+            }}>
+              <div className="campo">
+                <label className="campo-label">Módulo *</label>
+                <select
+                  className="campo-input"
+                  value={moduloAgregar}
+                  onChange={(e) => setModuloAgregar(Number(e.target.value))}
+                  required
+                >
+                  <option value={0}>-- Seleccioná un módulo --</option>
+                  {modulosDisponibles
+                    .filter((m) => !cursoEditar?.modulos?.some((cm) => cm.id === m.id))
+                    .map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.titulo} ({NIVELES.find((n) => n.id === m.nivel_id)?.nombre || "Nivel"})
+                      </option>
+                    ))}
+                </select>
+              </div>
+              <button type="submit" className="boton-primario">➕ Agregar al curso</button>
+            </form>
+          </div>
         </div>
       )}
+
       {/* ── Lista de módulos ── */}
       {seccion === "modulos" && (
         <div className="form-card">
@@ -424,6 +421,7 @@ async function abrirEditorCurso(cursoId: number) {
           }
         </div>
       )}
+
       {/* ── Crear curso ── */}
       {seccion === "crearCurso" && (
         <div className="form-card">
