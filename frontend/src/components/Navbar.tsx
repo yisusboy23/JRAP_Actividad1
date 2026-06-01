@@ -43,7 +43,7 @@ export default function Navbar() {
                 }
               }}
             >
-              Salir
+              Cerrar Sesión
             </button>
           </>
         ) : (
