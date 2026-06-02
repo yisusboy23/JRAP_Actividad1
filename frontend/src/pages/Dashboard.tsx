@@ -6,6 +6,7 @@ interface Modulo {
   id: number;
   titulo: string;
   orden: number;
+  completado: number; // 0 o 1 — viene del backend
 }
 
 interface Curso {
@@ -45,13 +46,26 @@ export default function Dashboard() {
     }).finally(() => setCargando(false));
   }, []);
 
+  // Cuando cambia el estudiante, recargamos los módulos abiertos
+  // con el progreso actualizado de ESE estudiante
   useEffect(() => {
     if (estudianteId > 0) {
       getMisPuntos(estudianteId).then((res) => setPuntos(res.data));
+
+      // Refrescar módulos ya abiertos con el progreso del nuevo estudiante
+      setCursos((prev) =>
+        prev.map((c) =>
+          c.modulos ? { ...c, modulos: undefined } : c
+        )
+      );
+    } else {
+      setPuntos(null);
+      // Limpiar módulos al deseleccionar estudiante
+      setCursos((prev) => prev.map((c) => ({ ...c, modulos: undefined })));
     }
   }, [estudianteId]);
 
-  async function handleCompletarModulo(moduloId: number): Promise<void> {
+  async function handleCompletarModulo(cursoId: number, moduloId: number): Promise<void> {
     if (estudianteId === 0) {
       setMensaje("Seleccioná un estudiante primero");
       setTimeout(() => setMensaje(""), 3000);
@@ -60,19 +74,45 @@ export default function Dashboard() {
     try {
       const res = await completarModulo({ usuarioId: estudianteId, moduloId });
       const { totalPuntos, nuevasInsignias } = res.data;
+
       setPuntos((prev) => ({ total_puntos: totalPuntos, posicion: prev?.posicion }));
-      setMensaje(nuevasInsignias.length > 0 ? `Nueva insignia: ${nuevasInsignias.join(", ")}` : "Módulo completado. +10 puntos");
+
+      // ── FIX PRINCIPAL: marcar el módulo como completado en el estado local ──
+      setCursos((prev) =>
+        prev.map((c) => {
+          if (c.id !== cursoId || !c.modulos) return c;
+          return {
+            ...c,
+            modulos: c.modulos.map((m) =>
+              m.id === moduloId ? { ...m, completado: 1 } : m
+            ),
+          };
+        })
+      );
+
+      setMensaje(
+        nuevasInsignias.length > 0
+          ? `🏅 Nueva insignia: ${nuevasInsignias.join(", ")}`
+          : "✅ Módulo completado. +10 puntos"
+      );
       setTimeout(() => setMensaje(""), 3000);
     } catch {
       setMensaje("Error al completar módulo");
     }
   }
 
+  // Carga los módulos del curso CON el progreso del estudiante seleccionado
   async function handleVerModulos(cursoId: number): Promise<void> {
-    const res = await api.get(`/courses/${cursoId}`);
-    setCursos((prev) => prev.map((c) =>
-      c.id === cursoId ? { ...c, modulos: res.data.modulos } : c
-    ));
+    const url = estudianteId > 0
+      ? `/courses/${cursoId}?uid=${estudianteId}` // el backend ya usa req.usuario?.id
+      : `/courses/${cursoId}`;
+
+    const res = await api.get(url);
+    setCursos((prev) =>
+      prev.map((c) =>
+        c.id === cursoId ? { ...c, modulos: res.data.modulos } : c
+      )
+    );
   }
 
   if (cargando) return <p className="mensaje-centro">Cargando...</p>;
@@ -82,7 +122,10 @@ export default function Dashboard() {
 
       <div className="selector-estudiante">
         <label>Estudiante:</label>
-        <select onChange={(e) => setEstudianteId(Number(e.target.value))} value={estudianteId}>
+        <select
+          onChange={(e) => setEstudianteId(Number(e.target.value))}
+          value={estudianteId}
+        >
           <option value={0}>-- Seleccioná un estudiante --</option>
           {estudiantes.map((est) => (
             <option key={est.id} value={est.id}>{est.nombre}</option>
@@ -107,20 +150,45 @@ export default function Dashboard() {
             <p className="descripcion">{curso.descripcion}</p>
             <p className="instructor">Instructor: {curso.instructor}</p>
 
-            <button className="boton-secundario" onClick={() => handleVerModulos(curso.id)}>
+            <button
+              className="boton-secundario"
+              onClick={() => handleVerModulos(curso.id)}
+            >
               Ver módulos
             </button>
 
             {curso.modulos && (
               <ul className="lista-modulos">
-                {curso.modulos.map((mod) => (
-                  <li key={mod.id} className="modulo-item">
-                    <span>{mod.orden}. {mod.titulo}</span>
-                    <button className="boton-modulo" onClick={() => handleCompletarModulo(mod.id)}>
-                      ✓ Completar
-                    </button>
-                  </li>
-                ))}
+                {curso.modulos.map((mod) => {
+                  const yaCompletado = mod.completado === 1;
+                  return (
+                    <li key={mod.id} className="modulo-item">
+                      <span>
+                        {mod.orden}. {mod.titulo}
+                        {yaCompletado && (
+                          <span style={{ marginLeft: "0.4rem", color: "#16a34a" }}>
+                            ✓
+                          </span>
+                        )}
+                      </span>
+
+                      {/* ── FIX: botón deshabilitado si ya fue completado ── */}
+                      <button
+                        className="boton-modulo"
+                        onClick={() => handleCompletarModulo(curso.id, mod.id)}
+                        disabled={yaCompletado}
+                        title={yaCompletado ? "Ya completaste este módulo" : "Completar módulo"}
+                        style={
+                          yaCompletado
+                            ? { opacity: 0.45, cursor: "not-allowed" }
+                            : {}
+                        }
+                      >
+                        {yaCompletado ? "✓ Completado" : "✓ Completar"}
+                      </button>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </div>
