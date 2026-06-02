@@ -114,8 +114,24 @@ mi-formulario/
 git clone https://github.com/<usuario>/mi-formulario.git
 cd mi-formulario
 ```
-
-### 2. Configurar variables de entorno
+### 2. Importar BD
+Aprovisionamiento de la Base de Datos (Persistencia)
+Para el despliegue del esquema y la carga de datos iniciales del sistema LMS Gamification, se ha provisto un artefacto de paquete de aplicación de capa de datos (DAC Package) que garantiza la integridad de las relaciones y tipos de datos definidos en el modelo
+.
+Especificaciones del Artefacto:
+Archivo: LMS_Gamification.bacpac
+Ubicación: \ImportarBD\
+Contenido: Definiciones de objetos de base de datos (tablas, constraints, índices) y registros lógicos iniciales.
+Procedimiento de Despliegue mediante SSMS 20:
+Conexión a la Instancia: Inicie SQL Server Management Studio (SSMS) v20 y establezca conexión con la instancia local del motor de base de datos
+.
+Importación Lógica (BACPAC):
+En el Object Explorer, realice un clic derecho sobre el nodo Databases.
+Seleccione la tarea "Import Data-tier Application..." para iniciar el asistente de despliegue de paquetes DAC.
+Configuración de Origen: En la sección Import Settings, seleccione la opción "Import from local disk" y navegue hasta la ruta del archivo LMS_Gamification.bacpac.
+Configuración del Target (Base de Datos):
+En el campo New database name, asigne el identificador LMS_Gamification. Es crítico mantener este nombre para que coincida con la variable de entorno DB_NAME configurada en el archivo .env del backend
+### 3. Configurar variables de entorno
 
 Crear el archivo `backend/.env`:
 
@@ -128,26 +144,26 @@ JWT_SECRET=tu_clave_secreta_aqui
 JWT_EXPIRES=8h
 ```
 
-### 3. Instalar dependencias del Backend
+### 4. Instalar dependencias del Backend
 
 ```bash
 cd backend
 npm install
 ```
 
-### 4. Instalar dependencias del Frontend
+### 5. Instalar dependencias del Frontend
 
 ```bash
 cd ../frontend
 npm install
 ```
 
-### 5. Ejecutar en desarrollo
+### 6. Ejecutar en desarrollo
 
 ```bash
 # Terminal 1 — Backend
 cd backend
-npm start
+npm run dev
 # Servidor en: http://localhost:3000
 
 # Terminal 2 — Frontend
