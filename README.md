@@ -530,7 +530,4 @@ El sistema requiere SQL Server, por lo que el despliegue en servicios como Verce
 - **Railway** — con SQL Server o migrando a PostgreSQL
 - **Azure App Service** — nativo para SQL Server
 - **Docker** — contenedorizar backend + SQL Server
-
-> URL de despliegue: _(completar si aplica)_
-
 ---
