@@ -1,22 +1,6 @@
 Jesus Rafael Aviles Poita
 # 🎓 LMS Gamification — Sistema de Gestión de Aprendizaje con Gamificación
-
-> **Materia:** Implementación de Sistemas / Ingeniería de Software  
 > **Actividad:** Proyecto Integrador — Actividad 4  
-> **Puntaje:** 100 pts · Peso: 20% de la nota final
-
----
-
-## 👥 Integrantes del Equipo
-
-| Nombre | Rol |
-|--------|-----|
-| _(completar)_ | Líder de proyecto / Backend |
-| _(completar)_ | Arquitecto / Frontend |
-| _(completar)_ | QA / Pruebas |
-| _(completar)_ | DevOps / Documentación |
-
----
 
 ## 📋 Descripción del Sistema
 
