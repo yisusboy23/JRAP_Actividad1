@@ -116,8 +116,6 @@ cd mi-formulario
 ```
 ### 2. Importar BD
 ```
-
-
 Aprovisionamiento de la Base de Datos (Persistencia)
 Para el despliegue del esquema y la carga de datos iniciales del sistema LMS Gamification, se ha provisto un artefacto de paquete de aplicación de capa de datos (DAC Package) que garantiza la integridad de las relaciones y tipos de datos definidos en el modelo
 .
@@ -134,6 +132,7 @@ Seleccione la tarea "Import Data-tier Application..." para iniciar el asistente 
 Configuración de Origen: En la sección Import Settings, seleccione la opción "Import from local disk" y navegue hasta la ruta del archivo LMS_Gamification.bacpac.
 Configuración del Target (Base de Datos):
 En el campo New database name, asigne el identificador LMS_Gamification. Es crítico mantener este nombre para que coincida con la variable de entorno DB_NAME configurada en el archivo .env del backend
+```
 ### 3. Configurar variables de entorno
 
 Crear el archivo `backend/.env`:
