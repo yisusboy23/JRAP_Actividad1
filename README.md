@@ -534,11 +534,3 @@ El sistema requiere SQL Server, por lo que el despliegue en servicios como Verce
 > URL de despliegue: _(completar si aplica)_
 
 ---
-
-## 📚 Referencias
-
-- Gang of Four — *Design Patterns: Elements of Reusable Object-Oriented Software*
-- Fowler, M. — *Refactoring: Improving the Design of Existing Code*
-- PMBOK Guide — Gestión de proyectos (Triángulo de Hierro)
-- Jest Documentation — https://jestjs.io/docs/getting-started
-- Supertest — https://github.com/ladjs/supertest
