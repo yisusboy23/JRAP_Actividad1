@@ -115,6 +115,9 @@ git clone https://github.com/<usuario>/mi-formulario.git
 cd mi-formulario
 ```
 ### 2. Importar BD
+```
+
+
 Aprovisionamiento de la Base de Datos (Persistencia)
 Para el despliegue del esquema y la carga de datos iniciales del sistema LMS Gamification, se ha provisto un artefacto de paquete de aplicación de capa de datos (DAC Package) que garantiza la integridad de las relaciones y tipos de datos definidos en el modelo
 .
