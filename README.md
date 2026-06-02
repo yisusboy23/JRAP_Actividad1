@@ -156,7 +156,7 @@ npm install
 ### 5. Instalar dependencias del Frontend
 
 ```bash
-cd ../frontend
+cd frontend
 npm install
 ```
 
